@@ -1,0 +1,60 @@
+/* FL8 / Rezolv "Next-Gen" type system: Inter body, EB Garamond serif display, IBM Plex Mono.
+ * Must precede @import "tailwindcss" — Turbopack/Lightning CSS requires all @import first. */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=EB+Garamond:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap');
+@import "tailwindcss";
+
+/*
+ * FL8 / Rezolv design language (mirrors c.fl8.in tokens):
+ *   warm cream canvas · near-black slate ink · wine primary · muted-gold accent.
+ * Legacy token NAMES kept so existing utility usages re-skin in place.
+ */
+@theme inline {
+  --color-brand-blue: #B23457;    /* wine primary (hsl 343 55% 45%) — name kept, value is FL8 wine */
+  --color-brand-wine: #B23457;
+  --color-brand-wine-hover: #962C4A;
+  --color-accent-gold: #B39661;
+  --color-sidebar-bg: #14161A;    /* deep slate rail */
+  --color-page-bg: #F7F5F3;       /* warm cream canvas */
+  --color-card-bg: #FFFFFF;
+  --color-card-border: #DCDFE4;
+  --color-text-primary: #121417;
+  --color-text-secondary: #636874;
+  --color-text-muted: #8A909C;
+  --color-border: #DCDFE4;
+  --color-success: #1F7A44;
+  --color-warning: #C68A3E;
+  --color-danger: #C4432B;
+  --color-table-header: #F1EEE9;
+  --color-ops-bg: #F7F5F3;
+  --color-ops-sidebar: #14161A;
+
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-serif: 'EB Garamond', Georgia, serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+}
+
+* {
+  border-color: #DCDFE4;
+}
+
+body {
+  background: var(--color-page-bg);
+  color: var(--color-text-primary);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Editorial display headings — EB Garamond, light weight (the FL8 signature). */
+.font-serif,
+.display-serif {
+  font-family: 'EB Garamond', Georgia, serif;
+}
+.display-serif {
+  font-weight: 300;
+  letter-spacing: -0.01em;
+}
+.font-mono,
+code, pre, kbd {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+}
