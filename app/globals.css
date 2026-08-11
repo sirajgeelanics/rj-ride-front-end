@@ -1,0 +1,291 @@
+/* FL8 / Rezolv "Next-Gen" type system: Inter body, EB Garamond serif display, IBM Plex Mono.
+ * Must precede @import "tailwindcss" — Lightning CSS requires all @import first. */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=EB+Garamond:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap');
+@import "tailwindcss";
+
+/*
+ * FL8 / Rezolv design language (mirrors c.fl8.in tokens):
+ *   warm cream canvas · near-black slate ink · wine primary · muted-gold accent.
+ * The legacy ops token NAMES are kept (brand-blue, ops-*, text-*) so the ~700
+ * existing utility usages re-skin in place — only the VALUES move to FL8.
+ */
+@theme {
+  --color-ops-bg: #F7F5F3;        /* warm cream canvas  (hsl 36 22% 96%) */
+  --color-ops-sidebar: #14161A;   /* deep slate rail    (hsl 220 13% 8%) */
+  --color-ops-card: #FFFFFF;
+  --color-ops-card2: #F1EEE9;     /* subtle warm panel */
+  --color-brand-blue: #B23457;    /* wine primary       (hsl 343 55% 45%) — name kept, value is FL8 wine */
+  --color-brand-wine: #B23457;
+  --color-brand-wine-hover: #962C4A;
+  --color-accent-gold: #B39661;   /* muted gold accent  (hsl 39 35% 54%) */
+  --color-success: #1F7A44;
+  --color-alert-amber: #C68A3E;
+  --color-danger: #C4432B;
+  --color-text-primary: #121417;  /* slate ink */
+  --color-text-secondary: #636874;
+  --color-text-tertiary: #8A909C;
+  --color-border: #DCDFE4;
+
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-serif: 'EB Garamond', Georgia, serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+}
+
+* {
+  @apply border-[#DCDFE4];
+}
+
+html {
+  color-scheme: light;
+}
+
+body {
+  @apply bg-[#F7F5F3] text-[#121417];
+  font-size: 14px;
+  font-family: 'Inter', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Editorial display headings — EB Garamond, light weight, tight tracking (the FL8 signature). */
+.font-serif,
+.display-serif {
+  font-family: 'EB Garamond', Georgia, serif;
+}
+.display-serif {
+  font-weight: 300;
+  letter-spacing: -0.01em;
+}
+.font-mono,
+code, pre, kbd {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+}
+
+button {
+  @apply transition-colors;
+}
+
+/* Custom scrollbar */
+body ::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+body ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+body ::-webkit-scrollbar-thumb {
+  background: #8B8FA8;
+  border-radius: 4px;
+}
+
+body ::-webkit-scrollbar-thumb:hover {
+  background: #6B7F99;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #8B8FA8;
+  border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #6B7F99;
+}
+
+/* Animations */
+@keyframes slide-in-right {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slide-up {
+  from {
+    transform: translateY(12px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes scale-in {
+  from {
+    transform: scale(0.95);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes pulse-border {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(90, 106, 207, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(90, 106, 207, 0);
+  }
+}
+
+@keyframes count-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right 0.3s ease-out;
+}
+
+.animate-slide-up {
+  animation: slide-up 0.3s ease-out;
+}
+
+.animate-scale-in {
+  animation: scale-in 0.2s ease-out;
+}
+
+.animate-fade-in {
+  animation: fade-in 0.2s ease-out;
+}
+
+.animate-shimmer {
+  background: linear-gradient(90deg, #F1EEE9 25%, #F7F5F3 50%, #F1EEE9 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+.animate-pulse-border {
+  animation: pulse-border 2s infinite;
+}
+
+.animate-count-up {
+  animation: count-up 0.4s ease-out;
+}
+
+/* Background grid pattern */
+.bg-ops-grid {
+  background-image:
+    linear-gradient(rgba(178, 52, 87, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(178, 52, 87, 0.025) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+/* Status badge colors */
+.status-draft {
+  @apply bg-gray-600 text-white;
+}
+
+.status-confirmed {
+  @apply bg-brand-blue text-white;
+}
+
+.status-assigned {
+  @apply bg-brand-blue text-white;
+}
+
+.status-in-progress {
+  @apply bg-alert-amber text-white;
+}
+
+.status-completed {
+  @apply bg-success text-white;
+}
+
+.status-billed {
+  @apply bg-teal-600 text-white;
+}
+
+.status-cancelled {
+  @apply bg-danger text-white;
+}
+
+.status-pending {
+  @apply bg-gray-600 text-white;
+}
+
+.status-driver-accepted {
+  @apply bg-brand-blue text-white;
+}
+
+.status-driver-rejected {
+  @apply bg-danger text-white;
+}
+
+.status-en-route-pickup {
+  @apply bg-alert-amber text-white;
+}
+
+.status-at-pickup {
+  @apply bg-alert-amber text-white;
+}
+
+.status-pax-picked {
+  @apply bg-alert-amber text-white;
+}
+
+.status-in-transit {
+  @apply bg-alert-amber text-white;
+}
+
+.status-at-drop {
+  @apply bg-teal-600 text-white;
+}
+
+.status-pax-dropped {
+  @apply bg-success text-white;
+}
+
+.status-no-show {
+  @apply bg-danger text-white;
+}
+
+.status-breakdown {
+  @apply bg-danger text-white;
+}
+
+.status-accident {
+  @apply bg-danger text-white;
+}
+
+.status-vehicle-swap {
+  @apply bg-purple-600 text-white;
+}
+
+.status-delayed {
+  @apply bg-alert-amber text-white;
+}
+
+.status-sos {
+  @apply bg-danger text-white font-bold animate-pulse;
+}
