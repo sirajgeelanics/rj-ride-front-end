@@ -41,10 +41,10 @@ export const Modal: React.FC<ModalProps> = ({ open, onClose, title, children, si
 
   return (
     <div
-      // Frosted backdrop, matching Drawer. `bg-black bg-opacity-50` read as a flat blackout and
+      // Frosted backdrop, matching Drawer. `bg-[#072D62] bg-opacity-50` read as a flat blackout and
       // is Tailwind v3 syntax besides; the slash-opacity + backdrop-blur keeps the page legible
       // behind the dialog. z-[60] is explicit so it doesn't rely on a non-default `z-60` class.
-      className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[60]"
+      className="fixed inset-0 bg-[#072D62]/40 backdrop-blur-sm flex items-center justify-center z-[60]"
       onClick={onClose}
     >
       <div

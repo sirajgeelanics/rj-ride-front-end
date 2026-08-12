@@ -19,7 +19,7 @@ export const Toaster: React.FC = () => {
         <div
           key={toast.id}
           className="flex items-start gap-3 px-4 py-3 rounded-xl shadow-2xl backdrop-blur-sm text-white animate-slide-in-right pointer-events-auto"
-          style={{ backgroundColor: '#14161A' }}
+          style={{ backgroundColor: '#072D62' }}
         >
           {iconMap[toast.type]}
           <span className="flex-1 text-sm font-medium">{toast.message}</span>
