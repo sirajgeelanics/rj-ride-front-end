@@ -23,7 +23,7 @@ export const Drawer: React.FC<DrawerProps> = ({ open, onClose, title, children, 
     <>
       {open && (
         <div
-          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40"
+          className="fixed inset-0 bg-[#072D62]/40 backdrop-blur-sm z-40"
           onClick={onClose}
         />
       )}

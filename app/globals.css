@@ -5,13 +5,13 @@
 
 /*
  * FL8 / Rezolv design language (mirrors c.fl8.in tokens):
- *   warm cream canvas · near-black slate ink · wine primary · muted-gold accent.
+ *   warm cream canvas · deep navy ink (#072D62) · wine primary · muted-gold accent.
  * The legacy ops token NAMES are kept (brand-blue, ops-*, text-*) so the ~700
  * existing utility usages re-skin in place — only the VALUES move to FL8.
  */
 @theme {
   --color-ops-bg: #F7F5F3;        /* warm cream canvas  (hsl 36 22% 96%) */
-  --color-ops-sidebar: #14161A;   /* deep slate rail    (hsl 220 13% 8%) */
+  --color-ops-sidebar: #072D62;   /* deep slate rail    (hsl 220 13% 8%) */
   --color-ops-card: #FFFFFF;
   --color-ops-card2: #F1EEE9;     /* subtle warm panel */
   --color-brand-blue: #B23457;    /* wine primary       (hsl 343 55% 45%) — name kept, value is FL8 wine */
@@ -21,7 +21,7 @@
   --color-success: #1F7A44;
   --color-alert-amber: #C68A3E;
   --color-danger: #C4432B;
-  --color-text-primary: #121417;  /* slate ink */
+  --color-text-primary: #072D62;  /* navy ink */
   --color-text-secondary: #636874;
   --color-text-tertiary: #8A909C;
   --color-border: #DCDFE4;
@@ -40,7 +40,7 @@ html {
 }
 
 body {
-  @apply bg-[#F7F5F3] text-[#121417];
+  @apply bg-[#F7F5F3] text-[#072D62];
   font-size: 14px;
   font-family: 'Inter', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
