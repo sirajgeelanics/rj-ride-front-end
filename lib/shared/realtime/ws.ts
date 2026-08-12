@@ -123,7 +123,7 @@ export function connectEvents({
       : undefined) ??
     (typeof window !== "undefined"
       ? window.location.origin.replace(/^http/, "ws")
-      : "ws://localhost:8000");
+      : "wss://api-ravani.rezolv.app");
 
   function resetHeartbeat() {
     if (heartbeatTimer) clearTimeout(heartbeatTimer);

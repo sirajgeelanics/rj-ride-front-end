@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 
-const API_ORIGIN = process.env.API_ORIGIN ?? "http://192.168.1.39:8000";
+const API_ORIGIN = process.env.API_ORIGIN ?? "https://api-ravani.rezolv.app";
 
 // Proxy /api/* to the Django backend, preserving the trailing slash the API client
 // sends. A next.config `rewrites` entry drops the trailing slash (Django then 301-loops
