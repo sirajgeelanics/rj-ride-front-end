@@ -135,7 +135,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen = false, onMobileCl
       {mobileOpen && (
         <div className="lg:hidden fixed inset-0 z-50">
           {/* Backdrop */}
-          <div className="absolute inset-0 bg-black/40" onClick={onMobileClose} />
+          <div className="absolute inset-0 bg-[#072D62]/40" onClick={onMobileClose} />
           {/* Sidebar panel */}
           <div className="absolute left-0 top-0 h-full shadow-2xl animate-in slide-in-from-left">
             {sidebarContent}

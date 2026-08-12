@@ -34,7 +34,7 @@ export const Modal: React.FC<ModalProps> = ({ open, onClose, title, children, si
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={confirmModal ? undefined : onClose} />
+      <div className="absolute inset-0 bg-[#072D62]/40 backdrop-blur-sm" onClick={confirmModal ? undefined : onClose} />
       <div className={`relative bg-card-bg rounded-xl shadow-2xl w-full ${sizeClasses[size]} max-h-[90vh] overflow-y-auto`}>
         {title && (
           <div className="flex items-center justify-between px-6 py-4 border-b border-border">
