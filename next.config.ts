@@ -29,7 +29,7 @@ const config: NextConfig = {
       beforeFiles: [
         {
           source: "/api/:path*",
-          destination: `${process.env.API_ORIGIN ?? "http://localhost:8000"}/api/:path*`,
+          destination: `${process.env.API_ORIGIN ?? "https://api-ravani.rezolv.app"}/api/:path*`,
         },
         {
           source: "/vendor/_next/:path*",
