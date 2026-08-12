@@ -1,7 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   // ⚠️ Must match the Cloudflare Worker name for the AGENCY portal. Rename if yours differs.
-  "name": "ride-agency",
+  "name": "rj-ravani-admin-front-end",
   "main": ".open-next/worker.js",
   "compatibility_date": "2025-03-25",
   "compatibility_flags": ["nodejs_compat"],
