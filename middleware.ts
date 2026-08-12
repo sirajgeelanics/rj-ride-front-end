@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 
-const API_ORIGIN = process.env.API_ORIGIN ?? "http://192.168.1.39:8000";
+const API_ORIGIN = process.env.API_ORIGIN ?? "https://api-ravani.rezolv.app";
 
 export function middleware(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
