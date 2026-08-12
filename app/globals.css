@@ -5,7 +5,7 @@
 
 /*
  * FL8 / Rezolv design language (mirrors c.fl8.in tokens):
- *   warm cream canvas · near-black slate ink · wine primary · muted-gold accent.
+ *   warm cream canvas · deep navy ink (#072D62) · wine primary · muted-gold accent.
  * Legacy token NAMES kept so existing utility usages re-skin in place.
  */
 @theme inline {
@@ -13,11 +13,11 @@
   --color-brand-wine: #B23457;
   --color-brand-wine-hover: #962C4A;
   --color-accent-gold: #B39661;
-  --color-sidebar-bg: #14161A;    /* deep slate rail */
+  --color-sidebar-bg: #072D62;    /* deep navy rail */
   --color-page-bg: #F7F5F3;       /* warm cream canvas */
   --color-card-bg: #FFFFFF;
   --color-card-border: #DCDFE4;
-  --color-text-primary: #121417;
+  --color-text-primary: #072D62;
   --color-text-secondary: #636874;
   --color-text-muted: #8A909C;
   --color-border: #DCDFE4;
@@ -26,7 +26,7 @@
   --color-danger: #C4432B;
   --color-table-header: #F1EEE9;
   --color-ops-bg: #F7F5F3;
-  --color-ops-sidebar: #14161A;
+  --color-ops-sidebar: #072D62;
 
   --font-sans: 'Inter', system-ui, sans-serif;
   --font-serif: 'EB Garamond', Georgia, serif;

@@ -13,7 +13,7 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({ open, on
 
   return (
     <div className="fixed inset-0 z-50">
-      <div className="absolute inset-0 bg-black/30" onClick={onClose} />
+      <div className="absolute inset-0 bg-[#072D62]/30" onClick={onClose} />
       <div className="absolute right-0 top-0 h-full w-full sm:w-[400px] bg-card-bg shadow-2xl overflow-y-auto">
         <div className="flex items-center justify-between px-5 py-4 border-b border-border sticky top-0 bg-card-bg z-10">
           <div className="flex items-center gap-2">
