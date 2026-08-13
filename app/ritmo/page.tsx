@@ -482,9 +482,7 @@ export default function RitmoPage() {
                         {trip.airport_code}
                       </span>
                     )}
-                    {trip.customer_name && (
-                      <span className="text-sm text-text-secondary">{trip.customer_name}</span>
-                    )}
+                    <span className="text-sm text-text-secondary">RITMO</span>
                   </div>
                   <p className="text-xs text-text-secondary mt-1">
                     {trip.pickup_at ? new Date(trip.pickup_at).toLocaleString() : "—"}
