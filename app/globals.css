@@ -9,8 +9,8 @@
  * Legacy token NAMES kept so existing utility usages re-skin in place.
  */
 @theme inline {
-  --color-brand-blue: #B23457;    /* wine primary (hsl 343 55% 45%) — name kept, value is FL8 wine */
-  --color-brand-wine: #B23457;
+  --color-brand-blue: #072D62;    /* wine primary (hsl 343 55% 45%) — name kept, value is FL8 wine */
+  --color-brand-wine: #072D62;
   --color-brand-wine-hover: #962C4A;
   --color-accent-gold: #B39661;
   --color-sidebar-bg: #072D62;    /* deep navy rail */

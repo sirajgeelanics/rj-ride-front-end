@@ -90,7 +90,7 @@ export const RouteMap: React.FC<RouteMapProps> = ({ stops, height = "h-56" }) =>
       if (stops.length > 1) {
         const latlngs = stops.map((s) => [s.lat, s.lng] as [number, number]);
         L.polyline(latlngs, {
-          color: "#B23457",
+          color: "#072D62",
           weight: 3,
           opacity: 0.6,
           dashArray: "6, 4",
