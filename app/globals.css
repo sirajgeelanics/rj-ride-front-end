@@ -14,8 +14,8 @@
   --color-ops-sidebar: #072D62;   /* deep slate rail    (hsl 220 13% 8%) */
   --color-ops-card: #FFFFFF;
   --color-ops-card2: #F1EEE9;     /* subtle warm panel */
-  --color-brand-blue: #B23457;    /* wine primary       (hsl 343 55% 45%) — name kept, value is FL8 wine */
-  --color-brand-wine: #B23457;
+  --color-brand-blue: #072D62;    /* wine primary       (hsl 343 55% 45%) — name kept, value is FL8 wine */
+  --color-brand-wine: #072D62;
   --color-brand-wine-hover: #962C4A;
   --color-accent-gold: #B39661;   /* muted gold accent  (hsl 39 35% 54%) */
   --color-success: #1F7A44;
