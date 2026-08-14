@@ -86,7 +86,7 @@ export default function DashboardPage() {
       label: "Pending",
       value: pendingCount,
       icon: Clock,
-      color: "bg-amber-600",
+      color: "bg-[#072D62]",
       description: "Awaiting assignment",
     },
     {
