@@ -18,12 +18,12 @@ import {
   Inbox,
 } from "lucide-react";
 
-const NAV_ITEMS = [
+export const NAV_ITEMS = [
   { labelKey: "dashboard" as const, icon: LayoutDashboard, href: "/" },
   { labelKey: "pricingAndQuotes" as const, icon: Tags, href: "/pricing" },
   { labelKey: "tripRequests" as const, icon: Route, href: "/trips" },
-  { labelKey: "ritmo" as const, icon: Inbox, href: "/ritmo" },
-  { labelKey: "dispatch" as const, icon: Radio, href: "/dispatch" },
+  { labelKey: "Automated Trips" as const, icon: Inbox, href: "/ritmo" },
+  // { labelKey: "dispatch" as const, icon: Radio, href: "/dispatch" },
   { labelKey: "tracking" as const, icon: MapPin, href: "/tracking" },
   { labelKey: "billing" as const, icon: Receipt, href: "/billing" },
   // { labelKey: "apiConsole" as const, icon: Code2, href: "/api-console" },

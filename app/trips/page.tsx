@@ -28,24 +28,12 @@ export default function TripsPage() {
 
   return (
     <div className="p-6 space-y-6">
-      <div className="flex justify-between items-start">
-        <div>
-          <h1 className="text-3xl font-bold text-text-primary">{t("tripRequests", language)}</h1>
-          <p className="text-sm text-text-secondary mt-1">{t("manageConvoyBasedRequests", language)}</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <FleetFilterPanel />
-          <Button onClick={() => setShowCreateModal(true)} variant="primary">
-            {t("newTripRequest", language)}
-          </Button>
-        </div>
+      <div className="flex justify-between items-center gap-3">
+        <FleetFilterPanel />
+        <Button onClick={() => setShowCreateModal(true)} variant="primary">
+          {t("newTripRequest", language)}
+        </Button>
       </div>
-
-      <Card padding="md" className="bg-brand-blue/5 border-brand-blue/20">
-        <p className="text-xs text-text-tertiary">
-          <span className="font-semibold text-brand-blue">{t("convoyModel", language)}:</span> {t("convoyModelDescription", language)}
-        </p>
-      </Card>
 
       <Tabs tabs={TABS.map((tab) => ({ id: tab.id, label: t(tab.labelKey, language) }))} activeTab={activeTab} onChange={setActiveTab}>
         {activeTab === "list" && <TripsListTab />}

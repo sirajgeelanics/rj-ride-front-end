@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLanguageStore, t, apiClient, keys, QueryBoundary, formatMoney, toMinor, csrfFetch } from "@/lib/shared";
 import type { components } from "@/lib/shared/api/schema.d";
+import { fetchAllPages } from "@/hooks/useCursorPagination";
 import { Button } from "@/components/ui/Button";
 import { DataTable, Column } from "@/components/ui/DataTable";
 import { Drawer } from "@/components/ui/Drawer";
@@ -20,7 +21,6 @@ type BasisEnum = components["schemas"]["BasisEnum"];
 
 type RateCardInput = {
   vendor_id: string;
-  customer_id: string;
   vehicle_type_id: string;
   basis: BasisEnum;
   rate_per_km_minor?: number | null;
@@ -35,12 +35,12 @@ interface RateCardsTabProps {
   searchQuery?: string;
 }
 
-// The backend RateCardWriteSerializer expects `vendor`/`customer`/`vehicle_type` (not the
-// `_id`-suffixed form-state names). Map before sending or the POST 400s ("vendor is required").
+// The backend RateCardWriteSerializer expects `vendor`/`vehicle_type` (not the `_id`-suffixed
+// form-state names). Rate cards are keyed by vendor x vehicle type — no customer. Map before
+// sending or the POST 400s ("vendor is required").
 function toWire(input: RateCardInput): Record<string, unknown> {
   return {
     vendor: input.vendor_id,
-    customer: input.customer_id,
     vehicle_type: input.vehicle_type_id,
     basis: input.basis,
     rate_per_km_minor: input.rate_per_km_minor ?? undefined,
@@ -63,33 +63,20 @@ export const RateCardsTab: React.FC<RateCardsTabProps> = ({ searchQuery = "" }) 
   // store bought nothing. Resets when you leave the tab, which is the expected behaviour for
   // a filter row anyway.
   const [rateCardVendorId, setRateCardVendorId] = useState("");
-  const [rateCardCustomerId, setRateCardCustomerId] = useState("");
   const [rateCardVehicleTypeId, setRateCardVehicleTypeId] = useState("");
 
   const { data, isLoading, error } = useQuery({
     queryKey: keys.config.rateCards.list(),
     queryFn: async () => {
-      const { data: res, error: err } = await apiClient.GET("/v1/config/pricing/rate-cards", {});
-      if (err) throw err;
-      return res;
+      // Follow every cursor page so all rate cards load (and the count is correct) — not just 25.
+      return { results: await fetchAllPages<RateCard>("/api/v1/config/pricing/rate-cards/") };
     },
   });
 
   const { data: vendorsData } = useQuery({
     queryKey: keys.config.vendors.list(),
     queryFn: async () => {
-      const { data: res, error: err } = await apiClient.GET("/v1/config/vendors", {});
-      if (err) throw err;
-      return res;
-    },
-  });
-
-  const { data: customersData } = useQuery({
-    queryKey: keys.config.customers.list(),
-    queryFn: async () => {
-      const { data: res, error: err } = await apiClient.GET("/v1/config/customers", {});
-      if (err) throw err;
-      return res;
+      return { results: await fetchAllPages<components["schemas"]["Vendor"]>("/api/v1/config/vendors/") };
     },
   });
 
@@ -104,12 +91,10 @@ export const RateCardsTab: React.FC<RateCardsTabProps> = ({ searchQuery = "" }) 
 
   const rateCards = (data?.results ?? []) as RateCard[];
   const vendors = (vendorsData?.results ?? []) as components["schemas"]["Vendor"][];
-  const customers = (customersData?.results ?? []) as components["schemas"]["Customer"][];
   const vts = (vehicleTypesData?.results ?? []) as components["schemas"]["VehicleType"][];
 
   const filteredRateCards = rateCards.filter((r) => {
     if (rateCardVendorId && r.vendor !== rateCardVendorId) return false;
-    if (rateCardCustomerId && r.customer !== rateCardCustomerId) return false;
     if (rateCardVehicleTypeId && r.vehicle_type !== rateCardVehicleTypeId) return false;
     if (searchQuery.trim() && !r.basis.toLowerCase().includes(searchQuery.toLowerCase()) && !r.valid_from.includes(searchQuery)) return false;
     return true;
@@ -184,7 +169,6 @@ export const RateCardsTab: React.FC<RateCardsTabProps> = ({ searchQuery = "" }) 
   const today = new Date().toISOString().split("T")[0] ?? "";
   const emptyForm: RateCardInput = {
     vendor_id: vendors[0]?.id ?? "",
-    customer_id: customers[0]?.id ?? "",
     vehicle_type_id: vts[0]?.id ?? "",
     basis: "PER_KM",
     rate_per_km_minor: 2000,
@@ -221,7 +205,7 @@ export const RateCardsTab: React.FC<RateCardsTabProps> = ({ searchQuery = "" }) 
   const openCreate = () => {
     setDrawerMode("create");
     setSupersedingId(null);
-    setFormData({ ...emptyForm, vendor_id: vendors[0]?.id ?? "", customer_id: customers[0]?.id ?? "", vehicle_type_id: vts[0]?.id ?? "" });
+    setFormData({ ...emptyForm, vendor_id: vendors[0]?.id ?? "", vehicle_type_id: vts[0]?.id ?? "" });
     setRateText({
       perKm: minorToDollarText(emptyForm.rate_per_km_minor),
       perHour: minorToDollarText(emptyForm.rate_per_hour_minor),
@@ -245,7 +229,6 @@ export const RateCardsTab: React.FC<RateCardsTabProps> = ({ searchQuery = "" }) 
   const seedForm = (rc: RateCard) => {
     setFormData({
       vendor_id: rc.vendor,
-      customer_id: rc.customer,
       vehicle_type_id: rc.vehicle_type,
       basis: rc.basis,
       rate_per_km_minor: rc.rate_per_km_minor,
@@ -265,7 +248,7 @@ export const RateCardsTab: React.FC<RateCardsTabProps> = ({ searchQuery = "" }) 
   };
 
   const handleSave = () => {
-    if (!formData.vendor_id || !formData.customer_id || !formData.vehicle_type_id) {
+    if (!formData.vendor_id || !formData.vehicle_type_id) {
       addToast(t("vendorCustomerVehicleRequired", language), "error");
       return;
     }
@@ -317,12 +300,6 @@ export const RateCardsTab: React.FC<RateCardsTabProps> = ({ searchQuery = "" }) 
     {
       key: "vendor_name",
       header: t("vendor", language),
-      sortable: true,
-      render: (val): React.ReactNode => (val ? (val as string) : t("dash", language)),
-    },
-    {
-      key: "customer_name",
-      header: t("customer", language),
       sortable: true,
       render: (val): React.ReactNode => (val ? (val as string) : t("dash", language)),
     },
@@ -415,6 +392,7 @@ export const RateCardsTab: React.FC<RateCardsTabProps> = ({ searchQuery = "" }) 
       <div className="flex gap-3 flex-wrap">
         <SearchableSelect
           className="w-48"
+          clearable
           value={rateCardVendorId}
           onChange={setRateCardVendorId}
           placeholder="Search vendor…"
@@ -425,16 +403,7 @@ export const RateCardsTab: React.FC<RateCardsTabProps> = ({ searchQuery = "" }) 
         />
         <SearchableSelect
           className="w-48"
-          value={rateCardCustomerId}
-          onChange={setRateCardCustomerId}
-          placeholder="Search customer…"
-          options={[
-            { value: "", label: "All customers" },
-            ...customers.map((c) => ({ value: c.id, label: c.name })),
-          ]}
-        />
-        <SearchableSelect
-          className="w-48"
+          clearable
           value={rateCardVehicleTypeId}
           onChange={setRateCardVehicleTypeId}
           placeholder="Search vehicle type…"
@@ -481,24 +450,6 @@ export const RateCardsTab: React.FC<RateCardsTabProps> = ({ searchQuery = "" }) 
                 onChange={(value) => setFormData({ ...formData, vendor_id: value })}
                 options={vendors.map((v) => ({ value: v.id, label: v.name }))}
                 placeholder="Search vendor…"
-              />
-            )}
-          </FormField>
-
-          <FormField label={t("customer", language)} required>
-            {supersedingId ? (
-              // Locked while superseding: changing these would be a different deal, not a new
-              // version of this one, and supersede_rate_card rejects it with a 400.
-              <div className="px-3 py-2 bg-page-bg border border-border rounded-lg text-sm text-text-secondary">
-                {customers.find((o) => o.id === formData.customer_id)?.name ?? "—"}
-                <span className="ml-2 text-xs text-text-muted">(cannot change in a new version)</span>
-              </div>
-            ) : (
-              <SearchableSelect
-                value={formData.customer_id}
-                onChange={(value) => setFormData({ ...formData, customer_id: value })}
-                options={customers.map((c) => ({ value: c.id, label: c.name }))}
-                placeholder="Search customer…"
               />
             )}
           </FormField>

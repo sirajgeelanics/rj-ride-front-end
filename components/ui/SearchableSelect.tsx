@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { X } from "lucide-react";
 
 interface Option {
   value: string;
@@ -18,6 +19,8 @@ interface SearchableSelectProps {
   options: Option[];
   placeholder?: string;
   className?: string;
+  /** Show a ✕ to reset the selection to "" once a value is chosen (for filters). */
+  clearable?: boolean;
 }
 
 /**
@@ -32,6 +35,7 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
   options,
   placeholder = "Search…",
   className = "",
+  clearable = false,
 }) => {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -43,6 +47,8 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
   const [pos, setPos] = useState<{ top: number; left: number; width: number; drop: "down" | "up" } | null>(null);
 
   const selectedLabel = options.find((o) => o.value === value)?.label ?? "";
+  // While typing, the ✕ clears the query; while closed, it clears the selection.
+  const showClear = clearable && (open ? query.length > 0 : !!value);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -144,8 +150,30 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
             setQuery("");
           }
         }}
-        className="w-full px-3 py-2 bg-white border border-border rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-transparent"
+        className={`w-full px-3 py-2 bg-white border border-border rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-transparent ${showClear ? "pr-8" : ""}`}
       />
+      {showClear && (
+        <button
+          type="button"
+          aria-label="Clear selection"
+          onMouseDown={(e) => {
+            // mousedown + preventDefault keeps input focus where it is instead of shifting to the button.
+            e.preventDefault();
+            e.stopPropagation();
+            if (open && query) {
+              setQuery(""); // clear the typed text, keep the menu open
+              setHighlight(0);
+            } else {
+              onChange(""); // clear the selection
+              setQuery("");
+              setOpen(false);
+            }
+          }}
+          className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded text-text-tertiary hover:text-text-primary hover:bg-brand-blue/10 transition-colors"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      )}
       {open && pos && typeof document !== "undefined" && createPortal(
         <div
           ref={menuRef}

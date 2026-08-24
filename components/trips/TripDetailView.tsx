@@ -9,7 +9,6 @@ import { Badge } from "@/components/ui/Badge";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { PII } from "@/components/ui/PII";
 import { StateTransitionManager } from "@/components/trips/StateTransitionManager";
-import { MapPin, Clock, Users, CreditCard, Activity } from "lucide-react";
 
 type TripRequest = components["schemas"]["TripRequest"];
 type TripVehicle = components["schemas"]["TripVehicle"];
@@ -18,20 +17,6 @@ type Stop = components["schemas"]["Stop"];
 interface TripDetailViewProps {
   tripId: string;
 }
-
-const STOP_TYPE_ICON: Record<string, string> = {
-  PICKUP: "🟢",
-  DROP: "🔴",
-  WAYPOINT: "🔵",
-};
-
-const LOCATION_TYPE_BADGE: Record<string, string> = {
-  AIRPORT: "✈",
-  RAIL: "🚂",
-  HOTEL: "🏨",
-  CITY: "🏙",
-  ADDRESS: "📍",
-};
 
 export const TripDetailView: React.FC<TripDetailViewProps> = ({ tripId }) => {
   const { data: trip, isLoading, error } = useQuery<TripRequest>({
@@ -83,26 +68,19 @@ export const TripDetailView: React.FC<TripDetailViewProps> = ({ tripId }) => {
         </div>
       </div>
 
-      <Card padding="md" header={
-        <h3 className="text-sm font-semibold flex items-center gap-2">
-          <MapPin className="w-4 h-4" /> Stops
-        </h3>
-      }>
+      <Card padding="md" header={<h3 className="text-sm font-semibold">Stops</h3>}>
         <ol className="space-y-2">
           {(trip.stops as Stop[]).map((stop) => (
             <li key={stop.sequence} className="flex items-start gap-3">
-              <span className="text-lg leading-none pt-0.5">{STOP_TYPE_ICON[stop.kind] ?? "•"}</span>
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <p className="text-sm font-medium text-text-primary">{stop.address}</p>
-                  <span className="text-xs">{LOCATION_TYPE_BADGE[stop.location_type]}</span>
-                </div>
-                <div className="text-xs text-text-secondary flex flex-wrap gap-2 mt-0.5">
+              <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-text-tertiary" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-text-primary">{stop.address}</p>
+                <div className="text-xs text-text-secondary flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
                   {(stopExtra(stop).flight_number as string | undefined) && (
-                    <span>✈ {stopExtra(stop).flight_number as string}</span>
+                    <span>Flight {stopExtra(stop).flight_number as string}</span>
                   )}
                   {(stopExtra(stop).train_number as string | undefined) && (
-                    <span>🚂 {stopExtra(stop).train_number as string}</span>
+                    <span>Train {stopExtra(stop).train_number as string}</span>
                   )}
                 </div>
               </div>
@@ -112,11 +90,7 @@ export const TripDetailView: React.FC<TripDetailViewProps> = ({ tripId }) => {
         </ol>
       </Card>
 
-      <Card padding="md" header={
-        <h3 className="text-sm font-semibold flex items-center gap-2">
-          <CreditCard className="w-4 h-4" /> Vehicles
-        </h3>
-      }>
+      <Card padding="md" header={<h3 className="text-sm font-semibold">Vehicles</h3>}>
         <div className="space-y-3">
           {(trip.vehicles as TripVehicle[]).map((v) => (
             <div key={v.id} className="p-3 rounded border border-border space-y-2">

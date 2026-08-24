@@ -149,20 +149,6 @@ export const FleetFilterPanel: React.FC = () => {
 
   return (
     <div className="space-y-3">
-      <button
-        onClick={() => setOpen((o) => !o)}
-        className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${
-          open || applied
-            ? "border-brand-wine/40 bg-brand-wine/5 text-brand-wine"
-            : "border-border bg-white text-text-secondary hover:bg-ops-card2 hover:text-text-primary"
-        }`}
-        aria-expanded={open}
-      >
-        <Filter className="w-4 h-4" />
-        Fleet by city & date
-        {applied && <Badge variant="green">filtered</Badge>}
-      </button>
-
       {open && (
         <Card padding="md" className="bg-ops-bg">
           <div className="flex flex-wrap items-end gap-3">

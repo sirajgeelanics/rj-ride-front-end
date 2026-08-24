@@ -6,7 +6,7 @@ import { useAuth } from "@/lib/shared";
 import { isApiError } from "@/lib/shared";
 
 export default function LoginPage() {
-  const { login } = useAuth();
+  const { login, logout } = useAuth();
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -18,7 +18,14 @@ export default function LoginPage() {
     setError(null);
     setLoading(true);
     try {
-      await login(email, password);
+      const user = await login(email, password);
+      // The admin portal is AGENCY_ADMIN-only. A vendor/driver login authenticates fine against
+      // the shared backend, so reject it here and drop the session rather than let them in.
+      if (user && user.role !== "AGENCY_ADMIN") {
+        await logout();
+        setError("This account is not an agency admin. Vendor accounts must use the vendor portal.");
+        return;
+      }
       router.replace("/");
     } catch (err) {
       if (isApiError(err)) {

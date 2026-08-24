@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
+import { csrfFetch } from "@/lib/shared";
 
 /**
  * Pull the `cursor` value out of a DRF pagination link.
@@ -18,6 +19,36 @@ export function cursorFromUrl(url: string | null | undefined): string | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * Walk a DRF cursor-paginated list to the very end and return every row.
+ *
+ * Cursor pagination returns one page (25 rows) plus a `next` link and — deliberately — no total
+ * count and no page-jump. Screens that must show or count the *whole* set (config lists, the
+ * dashboard's "registered vehicles" tile) therefore follow `next` page by page. We re-issue the
+ * same relative path with the extracted `cursor` each time rather than fetching DRF's absolute
+ * `next` URL directly, so the request always goes through the proxy with CSRF intact.
+ *
+ * `basePath` is a REST path that may already carry a query string (e.g. `?vendor_in=…`).
+ */
+export async function fetchAllPages<T>(basePath: string): Promise<T[]> {
+  const all: T[] = [];
+  let cursor: string | null = null;
+  // Hard cap: a misbehaving server that always returns `next` must not loop forever.
+  for (let guard = 0; guard < 1000; guard++) {
+    const sep = basePath.includes("?") ? "&" : "?";
+    const path = cursor
+      ? `${basePath}${sep}cursor=${encodeURIComponent(cursor)}`
+      : basePath;
+    const resp = await csrfFetch(path, { credentials: "include" });
+    if (!resp.ok) throw new Error(`Failed to load ${basePath} (${resp.status})`);
+    const body = (await resp.json()) as { results?: T[]; next?: string | null };
+    all.push(...(body.results ?? []));
+    cursor = cursorFromUrl(body.next);
+    if (!cursor) break;
+  }
+  return all;
 }
 
 export interface CursorPagination {

@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLanguageStore, t, apiClient, keys, QueryBoundary, csrfFetch } from "@/lib/shared";
+import { fetchAllPages } from "@/hooks/useCursorPagination";
 import type { components } from "@/lib/shared/api/schema.d";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Button } from "@/components/ui/Button";
@@ -23,6 +24,8 @@ interface VendorWriteInput {
   contact_email?: string;
   airport_code?: string;
   address?: string;
+  // Vendor-portal login password. Omitted -> unchanged on edit / default on create.
+  password?: string;
 }
 
 interface VendorsTabProps {
@@ -37,11 +40,9 @@ export const VendorsTab: React.FC<VendorsTabProps> = ({ searchQuery = "" }) => {
   const { data, isLoading, error } = useQuery({
     queryKey: keys.config.vendors.list({ name: searchQuery }),
     queryFn: async () => {
-      const { data: res, error: err } = await apiClient.GET("/v1/config/vendors", {
-        params: { query: { name: searchQuery || undefined } },
-      });
-      if (err) throw err;
-      return res;
+      // Follow every cursor page so all vendors load — not just the first 25.
+      const qs = searchQuery ? `?name=${encodeURIComponent(searchQuery)}` : "";
+      return { results: await fetchAllPages<Vendor>(`/api/v1/config/vendors/${qs}`) };
     },
   });
 
@@ -180,6 +181,8 @@ export const VendorsTab: React.FC<VendorsTabProps> = ({ searchQuery = "" }) => {
       // was empty). When editing a vendor that already had an airport code, leave its address
       // untouched so a real street address is never clobbered by a name-only edit.
       address: preserveAddress ? undefined : (airportCode || undefined),
+      // Only send a password when one was typed — blank leaves the login unchanged.
+      password: formData.password?.trim() ? formData.password : undefined,
     };
     if (editingId) {
       updateMutation.mutate({ id: editingId, input });
@@ -304,7 +307,22 @@ export const VendorsTab: React.FC<VendorsTabProps> = ({ searchQuery = "" }) => {
               onChange={(e) => setFormData({ ...formData, contact_email: e.target.value || undefined })}
               placeholder="contact@vendor.local"
             />
-            <p className="text-xs text-text-secondary mt-1">Becomes the vendor&apos;s portal login (password: Vendor@12345).</p>
+            <p className="text-xs text-text-secondary mt-1">Becomes the vendor&apos;s portal login username. Set the password below.</p>
+          </FormField>
+
+          <FormField label="Portal Password">
+            <Input
+              type="password"
+              value={formData.password ?? ""}
+              onChange={(e) => setFormData({ ...formData, password: e.target.value || undefined })}
+              placeholder={editingId ? "Leave blank to keep current password" : "Min 8 characters"}
+              autoComplete="new-password"
+            />
+            <p className="text-xs text-text-secondary mt-1">
+              {editingId
+                ? "Sets a new vendor-portal login password. Leave blank to keep the current one."
+                : "Vendor-portal login password. Leave blank to use the default (Vendor@12345)."}
+            </p>
           </FormField>
 
           <FormField label="Airport Code">

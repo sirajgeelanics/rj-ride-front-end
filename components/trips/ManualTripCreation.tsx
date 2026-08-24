@@ -123,9 +123,9 @@ export const ManualTripCreation: React.FC<{ onDone?: () => void }> = ({ onDone }
     },
   });
 
-  // Rate cards are the (vendor × customer × vehicle type) versioned price list. The vehicle
-  // type dropdown must only offer types that have an active card for the chosen customer +
-  // vendor — otherwise Create fails at quote time with "No rate card for X × Y".
+  // Rate cards are the (vendor × vehicle type) versioned price list — customer-independent.
+  // The vehicle type dropdown must only offer types that have an active card for the chosen
+  // vendor — otherwise Create fails at quote time with "No rate card for this vehicle type".
   const { data: rateCardsData } = useQuery({
     queryKey: keys.config.rateCards.list(),
     queryFn: async () => {
@@ -142,14 +142,15 @@ export const ManualTripCreation: React.FC<{ onDone?: () => void }> = ({ onDone }
   const vendors = (vendorsData?.results ?? []) as Vendor[];
   const rateCards = (rateCardsData?.results ?? []) as RateCard[];
 
-  // Vehicle types covered by an ACTIVE, currently-valid rate card for the selected pair.
-  // null while customer/vendor aren't both chosen — the dropdown stays unfiltered then.
+  // Vehicle types covered by an ACTIVE, currently-valid rate card for the selected vendor.
+  // null while no vendor is chosen — the dropdown stays unfiltered then. Pricing is by
+  // vendor × vehicle type, so the customer choice does not affect which cars are available.
   const eligibleVehicleTypeIds = useMemo(() => {
-    if (!customerId || !vendorId) return null;
+    if (!vendorId) return null;
     const today = new Date().toISOString().slice(0, 10);
     const ids = new Set<string>();
     for (const rc of rateCards) {
-      if (rc.vendor !== vendorId || rc.customer !== customerId) continue;
+      if (rc.vendor !== vendorId) continue;
       if (!rc.is_active) continue;
       // A superseded card is not what the backend quotes from — exclude it so the dropdown
       // exactly matches the offers Create will actually find.
@@ -159,7 +160,7 @@ export const ManualTripCreation: React.FC<{ onDone?: () => void }> = ({ onDone }
       ids.add(rc.vehicle_type);
     }
     return ids;
-  }, [rateCards, customerId, vendorId]);
+  }, [rateCards, vendorId]);
 
   const visibleVehicleTypes = eligibleVehicleTypeIds
     ? vehicleTypes.filter((v) => eligibleVehicleTypeIds.has(v.id))

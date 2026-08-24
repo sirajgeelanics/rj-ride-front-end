@@ -44,8 +44,18 @@ export const ListFilterBar: React.FC<ListFilterBarProps> = ({
           value={value.search}
           onChange={(e) => set({ search: e.target.value })}
           placeholder={searchPlaceholder}
-          className="w-full pl-9 pr-3 py-2 bg-white border border-border rounded-lg text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-blue"
+          className="w-full pl-9 pr-9 py-2 bg-white border border-border rounded-lg text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-blue"
         />
+        {value.search && (
+          <button
+            type="button"
+            onClick={() => set({ search: "" })}
+            aria-label="Clear search"
+            className="absolute right-2 top-[2.1rem] p-1 rounded-md text-text-tertiary hover:text-text-primary hover:bg-ops-bg transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
       </div>
 
       <div className="w-44">

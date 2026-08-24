@@ -10,7 +10,7 @@ import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { Pagination } from "@/components/ui/Pagination";
 import { useCursorPagination } from "@/hooks/useCursorPagination";
 import { StatusBadge } from "@/components/ui/StatusBadge";
-import { BellRing, Car, CheckCircle, Inbox, MapPin, RefreshCw, Search, Send, User, Pencil } from "lucide-react";
+import { BellRing, Car, CheckCircle, Inbox, MapPin, RefreshCw, Search, Send, User, Pencil, X } from "lucide-react";
 import type { TripStatus } from "@/lib/types";
 
 // The RITMO endpoints are not in the committed OpenAPI schema, so we type them locally and
@@ -111,7 +111,6 @@ export default function RitmoPage() {
   const [allotting, setAllotting] = useState<string | null>(null);
   const [alerting, setAlerting] = useState<string | null>(null);
   const [alertingAll, setAlertingAll] = useState(false);
-  const [sendingAll, setSendingAll] = useState(false);
   const [search, setSearch] = useState("");
   // A 1s ticker so the offer countdowns tick down live between refetches.
   const [now, setNow] = useState(() => Date.now());
@@ -344,44 +343,11 @@ export default function RitmoPage() {
     }
   };
 
-  const sendAllToRitmo = async () => {
-    setSendingAll(true);
-    try {
-      const resp = await csrfFetch("/api/v1/ritmo/push-all/", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-      });
-      if (!resp.ok) {
-        const body = (await resp.json().catch(() => ({}))) as { error?: { message?: string } };
-        throw new Error(body?.error?.message ?? `Send to RITMO failed (${resp.status})`);
-      }
-      const body = (await resp.json().catch(() => ({}))) as { result?: { pushed?: number } };
-      const n = body.result?.pushed ?? 0;
-      addToast(`Current status of ${n} RITMO request(s) sent back to RITMO.`, "success");
-    } catch (err) {
-      addToast(
-        isApiError(err) ? err.message : err instanceof Error ? err.message : "Failed to send to RITMO",
-        "error",
-      );
-    } finally {
-      setSendingAll(false);
-    }
-  };
-
   return (
-    <div className="space-y-4">
+    <div className="pt-6 space-y-4">
       <div className="flex items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-text-primary flex items-center gap-2">
-            <Inbox className="w-6 h-6" /> RITMO Requests
-          </h1>
-          <p className="text-sm text-text-secondary mt-0.5">
-            Bookings received from RITMO. Allot each vehicle to a vendor — the vendor has ~5 minutes
-            to accept in their portal, else the offer expires and you can re-allot.
-          </p>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <br></br>
+        <div className="flex items-center gap-4 shrink-0">
           <Button variant="secondary" size="sm" onClick={() => void refetch()} disabled={isFetching}>
             <RefreshCw className={`w-4 h-4 mr-1 ${isFetching ? "animate-spin" : ""}`} /> Refresh
           </Button>
@@ -401,16 +367,6 @@ export default function RitmoPage() {
               ? "Alerting…"
               : `Alert vendors${pendingAlertCount ? ` (${pendingAlertCount})` : ""}`}
           </Button>
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={() => void sendAllToRitmo()}
-            disabled={sendingAll || trips.length === 0}
-            title="Push the current status of every RITMO request back to RITMO"
-          >
-            <Send className="w-4 h-4 mr-1" />
-            {sendingAll ? "Sending…" : "Send to RITMO"}
-          </Button>
         </div>
       </div>
 
@@ -422,8 +378,18 @@ export default function RitmoPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search requests — reference, RITMO ref, passenger, car type, vendor, pickup or drop…"
-            className="w-full pl-9 pr-3 py-2 bg-white border border-border rounded-lg text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-blue"
+            className="w-full pl-9 pr-9 py-2 bg-white border border-border rounded-lg text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-blue"
           />
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch("")}
+              aria-label="Clear search"
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-md text-text-tertiary hover:text-text-primary hover:bg-ops-card2 transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
         </div>
       )}
 

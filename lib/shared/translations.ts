@@ -396,10 +396,8 @@ export const translations = {
     vouchers: 'Vouchers',
 
     // ─── Admin Trips ───
-    manageConvoyBasedRequests: 'Manage convoy-based transport requests with price-locked booking',
+    // manageConvoyBasedRequests: 'Manage convoy-based transport requests with price-locked booking',
     newTripRequest: 'New Trip Request',
-    convoyModel: 'Convoy Model',
-    convoyModelDescription: 'All vehicles share the same stop sequence. Each vehicle is independently quoted and booked against a frozen priceId. Confirm is blocked until every vehicle has a valid, unexpired offer.',
     createTripRequest: 'Create Trip Request',
     chooseCreationMethod: 'Choose how to create this trip',
     manualEntry: 'Manual Entry',
@@ -411,12 +409,7 @@ export const translations = {
     backToMethods: 'Back to methods',
 
     // ─── Admin Pricing ───
-    preNegotiatedRateCards: 'Pre-negotiated rate cards and dynamic quotes',
-    engine: 'Engine',
-    linkedCache: 'Linked ⟷ Cache',
-    cacheSynced: 'Cache (Synced)',
-    priceLockDesign: 'Price Lock Design',
-    priceLockDescription: 'Because prices are locked at quote time, cache/engine divergence does not affect booked orders. Each order cites a frozen priceId and rateCardVersion.',
+    // preNegotiatedRateCards: 'Pre-negotiated rate cards and dynamic quotes',
 
     // ─── Admin API Console ───
     partnerAPIConsole: 'Partner API Console',
@@ -454,8 +447,6 @@ export const translations = {
     baseCity: 'Base City',
     currency: 'Currency',
     todaysPickups: "Today's Pickups",
-    manageVendorsCustomersFleet: 'Manage vendors, customers, fleet, drivers, and services',
-    searchThisModule: 'Search this module...',
     of: 'of',
     all: 'all',
     yes: 'Yes',

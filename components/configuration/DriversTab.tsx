@@ -2,7 +2,8 @@
 
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useLanguageStore, t, apiClient, keys, QueryBoundary, csrfFetch, isApiError } from "@/lib/shared";
+import { useLanguageStore, t, apiClient, keys, QueryBoundary, isApiError } from "@/lib/shared";
+import { fetchAllPages } from "@/hooks/useCursorPagination";
 import type { components } from "@/lib/shared/api/schema.d";
 import { Button } from "@/components/ui/Button";
 import { DataTable, Column } from "@/components/ui/DataTable";
@@ -54,9 +55,8 @@ export const DriversTab: React.FC<DriversTabProps> = ({ searchQuery = "" }) => {
       // Server-side via ?vendor_in=<id>,<id> — the list is cursor-paginated, so filtering in
       // the browser would only ever search the rows already fetched.
       const qs = vendorFilter.length ? `?vendor_in=${vendorFilter.join(",")}` : "";
-      const resp = await csrfFetch(`/api/v1/fleet/drivers/${qs}`, { credentials: "include" });
-      if (!resp.ok) throw new Error(`Failed to load drivers (${resp.status})`);
-      return (await resp.json()) as { results?: ApiDriver[] };
+      // Follow every cursor page so all drivers load — not just the first 25.
+      return { results: await fetchAllPages<ApiDriver>(`/api/v1/fleet/drivers/${qs}`) };
     },
     // Always load current rows: a driver edited/deactivated elsewhere would otherwise linger and
     // 404 on edit/deactivate with "resource does not exist".
@@ -71,9 +71,8 @@ export const DriversTab: React.FC<DriversTabProps> = ({ searchQuery = "" }) => {
   const { data: vendorsData } = useQuery({
     queryKey: keys.config.vendors.list(),
     queryFn: async () => {
-      const { data: res, error: err } = await apiClient.GET("/v1/config/vendors", {});
-      if (err) throw err;
-      return res;
+      // All vendors — the filter dropdown must list every vendor, not the first 25.
+      return { results: await fetchAllPages<ApiVendor>("/api/v1/config/vendors/") };
     },
   });
   const vendors = (vendorsData?.results ?? []) as ApiVendor[];

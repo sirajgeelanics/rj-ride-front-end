@@ -33,7 +33,7 @@ interface SessionState {
 }
 
 interface AuthContextValue extends SessionState {
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<AuthUser | null>;
   logout: () => Promise<void>;
   requireRole: (...roles: UserRole[]) => boolean;
 }
@@ -82,6 +82,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (body.result) {
         queryClient.setQueryData(keys.me(), body.result);
       }
+      return body.result ?? null;
     },
     [queryClient]
   );

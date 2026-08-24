@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/Input";
 import { TripDetailView } from "@/components/trips/TripDetailView";
 import { cursorFromUrl } from "@/hooks/useCursorPagination";
 import { DateTimePicker } from "@/components/ui/DateTimePicker";
-import { ChevronRight, ChevronLeft, X, Building2 } from "lucide-react";
+import { ChevronRight, ChevronLeft, X, Building2, Clock, Car } from "lucide-react";
 import type { TripStatus } from "@/lib/types";
 
 type TripRequest = components["schemas"]["TripRequest"];
@@ -151,11 +151,11 @@ export const TripsListTab: React.FC = () => {
     <div className="space-y-4">
       <div className="flex flex-wrap gap-3 items-end">
         <div>
-          <label className="block text-xs text-text-secondary mb-1">Status</label>
+          <label className="block text-xs font-medium text-text-secondary mb-1">Status</label>
           <select
             value={statusFilter}
             onChange={(e) => { setStatusFilter(e.target.value); resetPagination(); }}
-            className="px-3 py-2 bg-white border border-border rounded-lg text-sm text-text-primary"
+            className="px-3 py-2 bg-white border border-border rounded-lg text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-blue"
           >
             {STATUS_FILTERS.map((s) => (
               <option key={s} value={s}>{s || "All statuses"}</option>
@@ -163,73 +163,95 @@ export const TripsListTab: React.FC = () => {
           </select>
         </div>
         <div>
-          <label className="block text-xs text-text-secondary mb-1">Date from</label>
+          <label className="block text-xs font-medium text-text-secondary mb-1">Date from</label>
           <DateTimePicker mode="date" value={dateFrom} onChange={(val) => { setDateFrom(val); resetPagination(); }} />
         </div>
         <div>
-          <label className="block text-xs text-text-secondary mb-1">Date to</label>
+          <label className="block text-xs font-medium text-text-secondary mb-1">Date to</label>
           <DateTimePicker mode="date" value={dateTo} onChange={(val) => { setDateTo(val); resetPagination(); }} />
         </div>
+        {!isLoading && trips.length > 0 && (
+          <span className="ml-auto self-center text-xs text-text-tertiary tabular-nums">
+            {trips.length} trip{trips.length !== 1 ? "s" : ""}{hasNext ? "+" : ""} on this page
+          </span>
+        )}
       </div>
 
       {isLoading ? (
-        <div className="py-8 text-center text-sm text-text-secondary">Loading trips…</div>
+        <div className="space-y-2">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="h-[70px] rounded-lg border border-border bg-white animate-pulse" />
+          ))}
+        </div>
       ) : trips.length === 0 ? (
-        <Card padding="lg" className="text-center text-text-secondary py-8">
-          <p>No trips found. Create your first trip request above.</p>
+        <Card padding="lg" className="text-center py-12">
+          <p className="text-sm font-medium text-text-primary">No trip requests found</p>
+          <p className="text-xs text-text-tertiary mt-1">Adjust the status or date range, or create a new trip request.</p>
         </Card>
       ) : (
         <div className="space-y-2">
-          {trips.map((trip) => (
-            <div
-              key={trip.id}
-              role="button"
-              tabIndex={0}
-              onClick={() => setSelectedTripId(trip.id)}
-              onKeyDown={(e) => e.key === "Enter" && setSelectedTripId(trip.id)}
-              className="p-3 rounded border border-border cursor-pointer hover:border-brand-blue/40 transition-colors bg-white"
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <StatusBadge status={trip.status as TripStatus} />
-                  <div>
-                    <p className="text-sm font-medium text-text-primary font-mono">
-                      {trip.reference}
-                      {trip.customer_name && (
-                        <span className="ml-2 text-text-secondary font-sans">{trip.customer_name}</span>
-                      )}
-                    </p>
-                    <p className="text-xs text-text-secondary mt-0.5">
-                      {trip.pickup_at ? new Date(trip.pickup_at).toLocaleString() : "—"}
-                      {trip.vehicles.length > 0 && ` · ${trip.vehicles.length} vehicle(s)`}
-                    </p>
-                    {assignedVendors(trip).length > 0 && (
-                      <p className="text-xs mt-0.5 flex items-center gap-1.5">
-                        <Building2 className="w-3 h-3 text-text-tertiary" />
-                        <span className="text-text-tertiary">Vendor:</span>
-                        <span className="text-text-primary font-medium">
-                          {assignedVendors(trip).join(", ")}
-                        </span>
-                      </p>
+          {trips.map((trip) => {
+            const vendors = assignedVendors(trip);
+            const cancelable = !["COMPLETED", "BILLED", "CANCELLED"].includes(trip.status);
+            return (
+              <div
+                key={trip.id}
+                role="button"
+                tabIndex={0}
+                onClick={() => setSelectedTripId(trip.id)}
+                onKeyDown={(e) => e.key === "Enter" && setSelectedTripId(trip.id)}
+                className="group flex items-center gap-4 rounded-lg border border-border bg-white px-4 py-3 cursor-pointer transition-all hover:border-brand-blue/40 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-brand-blue/30"
+              >
+                <StatusBadge status={trip.status as TripStatus} />
+
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-mono text-sm font-semibold text-text-primary">{trip.reference}</span>
+                    {trip.customer_name && (
+                      <span className="text-sm text-text-secondary truncate">· {trip.customer_name}</span>
+                    )}
+                    {trip.created_via === "RITMO" && (
+                      <span className="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-brand-blue/10 text-brand-blue">
+                        RITMO
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-0.5 text-xs text-text-secondary">
+                    <span className="inline-flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-text-tertiary shrink-0" />
+                      {trip.pickup_at ? new Date(trip.pickup_at).toLocaleString() : "No pickup time"}
+                    </span>
+                    {trip.vehicles.length > 0 && (
+                      <span className="inline-flex items-center gap-1.5">
+                        <Car className="w-3.5 h-3.5 text-text-tertiary shrink-0" />
+                        {trip.vehicles.length} vehicle{trip.vehicles.length !== 1 ? "s" : ""}
+                      </span>
+                    )}
+                    {vendors.length > 0 && (
+                      <span className="inline-flex items-center gap-1.5 min-w-0">
+                        <Building2 className="w-3.5 h-3.5 text-text-tertiary shrink-0" />
+                        <span className="truncate text-text-primary">{vendors.join(", ")}</span>
+                      </span>
                     )}
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  {!["COMPLETED", "BILLED", "CANCELLED"].includes(trip.status) && (
+
+                <div className="flex items-center gap-1 shrink-0">
+                  {cancelable && (
                     <Button
                       size="sm"
                       variant="ghost"
                       onClick={(e) => { e.stopPropagation(); openCancel(trip); }}
                       className="text-danger hover:bg-danger/10"
                     >
-                      <X className="w-3 h-3 mr-1" /> Cancel
+                      <X className="w-3.5 h-3.5 mr-1" /> Cancel
                     </Button>
                   )}
-                  <ChevronRight className="w-4 h-4 text-text-tertiary" />
+                  <ChevronRight className="w-4 h-4 text-text-tertiary transition-transform group-hover:translate-x-0.5" />
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 

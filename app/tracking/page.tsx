@@ -138,15 +138,6 @@ export default function TrackingPage() {
   return (
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-start">
-        <div>
-          <h1 className="text-3xl font-bold text-text-primary">Live Tracking</h1>
-          <p className="text-sm text-text-secondary mt-1">
-            Fleet positions from <code className="text-xs bg-ops-bg px-1 rounded">GET /v1/tracking/live</code> + <code className="text-xs bg-ops-bg px-1 rounded">tracking.position</code> WS.
-          </p>
-        </div>
-        <Badge variant="blue" className="flex items-center gap-1">
-          <MapIcon className="w-3 h-3" /> Live API
-        </Badge>
       </div>
 
       <div className="grid grid-cols-3 gap-4">

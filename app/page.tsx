@@ -3,6 +3,7 @@
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiClient, keys, wsInvalidationMap } from "@/lib/shared";
+import { fetchAllPages } from "@/hooks/useCursorPagination";
 import { useRideEvents } from "@/lib/shared/realtime/ws";
 import type { components } from "@/lib/shared/api/schema.d";
 import { Card } from "@/components/ui/Card";
@@ -39,21 +40,13 @@ export default function DashboardPage() {
 
   const { data: vehiclesData, isLoading: vehiclesLoading } = useQuery({
     queryKey: keys.fleet.vehicles.list(),
-    queryFn: async () => {
-      const { data: res, error: err } = await apiClient.GET("/v1/fleet/vehicles", {});
-      if (err) throw err;
-      return (res?.results ?? []) as Vehicle[];
-    },
+    queryFn: () => fetchAllPages<Vehicle>("/api/v1/fleet/vehicles/"),
     staleTime: 60_000,
   });
 
   const { data: driversData, isLoading: driversLoading } = useQuery({
     queryKey: keys.fleet.drivers.list(),
-    queryFn: async () => {
-      const { data: res, error: err } = await apiClient.GET("/v1/fleet/drivers", {});
-      if (err) throw err;
-      return (res?.results ?? []) as Driver[];
-    },
+    queryFn: () => fetchAllPages<Driver>("/api/v1/fleet/drivers/"),
     staleTime: 60_000,
   });
 
@@ -107,13 +100,6 @@ export default function DashboardPage() {
 
   return (
     <div className="p-6 space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-text-primary">Dashboard</h1>
-        <p className="text-sm text-text-secondary mt-1">
-          Live operational overview — auto-refreshes every 30 seconds via WebSocket.
-        </p>
-      </div>
-
       {exceptionCount > 0 && (
         <div className="bg-danger/10 border border-danger/30 rounded-xl p-4 flex items-start gap-3">
           <AlertCircle className="w-5 h-5 text-danger flex-shrink-0 mt-0.5" />

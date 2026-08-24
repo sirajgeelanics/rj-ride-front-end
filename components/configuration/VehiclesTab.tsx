@@ -2,7 +2,8 @@
 
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useLanguageStore, t, apiClient, keys, QueryBoundary, csrfFetch, isApiError } from "@/lib/shared";
+import { useLanguageStore, t, apiClient, keys, QueryBoundary, isApiError } from "@/lib/shared";
+import { fetchAllPages } from "@/hooks/useCursorPagination";
 import type { components } from "@/lib/shared/api/schema.d";
 import { Button } from "@/components/ui/Button";
 import { DataTable, Column } from "@/components/ui/DataTable";
@@ -50,9 +51,8 @@ export const VehiclesTab: React.FC<VehiclesTabProps> = ({ searchQuery = "" }) =>
       // cursor-paginated, so filtering the current page would only ever search the first 25
       // rows and silently miss the rest.
       const qs = vendorFilter.length ? `?vendor_in=${vendorFilter.join(",")}` : "";
-      const resp = await csrfFetch(`/api/v1/fleet/vehicles/${qs}`, { credentials: "include" });
-      if (!resp.ok) throw new Error(`Failed to load vehicles (${resp.status})`);
-      return (await resp.json()) as { results?: ApiVehicle[] };
+      // Follow every cursor page so all vehicles load — not just the first 25.
+      return { results: await fetchAllPages<ApiVehicle>(`/api/v1/fleet/vehicles/${qs}`) };
     },
     // Always load current rows: a row edited/deactivated in another tab (or before a data change)
     // would otherwise linger and 404 on edit/deactivate with "resource does not exist".
@@ -70,9 +70,8 @@ export const VehiclesTab: React.FC<VehiclesTabProps> = ({ searchQuery = "" }) =>
   const { data: vendorsData } = useQuery({
     queryKey: keys.config.vendors.list(),
     queryFn: async () => {
-      const { data: res, error: err } = await apiClient.GET("/v1/config/vendors", {});
-      if (err) throw err;
-      return res;
+      // All vendors — the filter dropdown must list every vendor, not the first 25.
+      return { results: await fetchAllPages<ApiVendor>("/api/v1/config/vendors/") };
     },
   });
   const { data: vtData } = useQuery({

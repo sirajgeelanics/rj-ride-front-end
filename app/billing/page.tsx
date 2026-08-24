@@ -42,10 +42,6 @@ export default function BillingPage() {
 
   return (
     <div className="p-6 space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-text-primary">Billing</h1>
-        <p className="text-sm text-text-secondary mt-1">Billable trips, statements, and payouts from the live API.</p>
-      </div>
 
       <div className="flex gap-1 border-b border-border pb-px">
         {BILLING_TABS.map((tab) => {

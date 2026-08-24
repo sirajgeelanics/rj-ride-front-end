@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { useLanguageStore, t } from "@/lib/shared";
-import { Search } from "lucide-react";
+import { Search, X } from "lucide-react";
 import { Tabs } from "@/components/ui/Tabs";
 import { VendorsTab } from "@/components/configuration/VendorsTab";
 import { CustomersTab } from "@/components/configuration/CustomersTab";
@@ -25,20 +25,26 @@ export default function ConfigurationPage() {
 
   return (
     <div className="p-6 space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-text-primary">{t("configuration", language)}</h1>
-        <p className="text-sm text-text-secondary mt-1">{t("manageVendorsCustomersFleet", language)}</p>
-      </div>
 
       <div className="relative max-w-md">
         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-text-secondary" />
         <input
           type="text"
-          placeholder={t("searchThisModule", language)}
+          placeholder={t("Search By Vendor,Cutomer,Vehicle type....", language)}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full pl-10 pr-3 py-2 bg-white border border-border rounded-lg text-sm text-text-primary placeholder-text-secondary focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-transparent"
+          className="w-full pl-10 pr-9 py-2 bg-white border border-border rounded-lg text-sm text-text-primary placeholder-text-secondary focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-transparent"
         />
+        {searchQuery && (
+          <button
+            type="button"
+            onClick={() => setSearchQuery("")}
+            aria-label="Clear search"
+            className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-md text-text-tertiary hover:text-text-primary hover:bg-ops-card2 transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
       </div>
 
       <Tabs tabs={TABS.map((tab) => ({ id: tab.id, label: t(tab.labelKey, language) }))} activeTab={activeTab} onChange={setActiveTab}>
