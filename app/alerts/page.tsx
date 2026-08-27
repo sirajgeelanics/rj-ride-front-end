@@ -292,7 +292,6 @@ export default function AlertsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold text-text-primary">{t("alerts", language)}</h2>
         <p className="text-sm text-text-muted mt-1">
           Open offers, notifications and fleet status
         </p>

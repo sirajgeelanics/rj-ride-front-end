@@ -19,7 +19,7 @@ interface EarningsChartProps {
 }
 
 const CHART_COLORS = {
-  earnings: "#B23457",
+  earnings: "#072D62",
 };
 
 export const EarningsChart: React.FC<EarningsChartProps> = ({ data }) => {

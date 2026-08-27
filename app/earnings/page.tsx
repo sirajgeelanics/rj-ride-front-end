@@ -184,7 +184,6 @@ export default function EarningsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold text-text-primary">{t("earnings", language)}</h2>
         <p className="text-sm text-text-muted mt-1">Your payouts and billing statements</p>
       </div>
 

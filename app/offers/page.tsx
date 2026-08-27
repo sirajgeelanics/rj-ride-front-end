@@ -210,9 +210,6 @@ export default function OffersPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <Inbox className="w-6 h-6" /> Offers
-          </h1>
           <p className="text-sm text-slate-500 mt-0.5">
             Trips offered to you. Accept before the timer runs out by assigning a vehicle and driver —
             otherwise the offer expires and returns to the agency.

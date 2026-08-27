@@ -13,7 +13,7 @@ import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { Drawer } from "@/components/ui/Drawer";
 import { TripMapViewWrapper } from "@/components/trips/TripMapViewWrapper";
 import { useDebounce } from "@/hooks/useDebounce";
-import { Search, X, CheckCircle, RefreshCw, Key } from "lucide-react";
+import { Search, X, CheckCircle, RefreshCw, MapPin } from "lucide-react";
 
 type Trip = components["schemas"]["TripRequest"];
 type Stop = components["schemas"]["Stop"];
@@ -28,9 +28,9 @@ const ACTIVE_STATUSES = new Set([
 
 const TERMINAL_STATUSES = new Set(["COMPLETED", "CANCELLED", "NO_SHOW"]);
 
-// The happy-path lifecycle in order. The vendor drives it with just two OTP actions
-// (Passenger Pickup, Passenger Drop); the intermediate driver states are advanced
-// automatically so a single click moves the whole journey forward.
+// The happy-path lifecycle in order. The vendor drives it with just two buttons
+// (Pickup, Drop) — no OTP; the intermediate driver states are advanced automatically so a
+// single click moves the whole journey forward.
 const LIFECYCLE = [
   "ASSIGNED",
   "DRIVER_ACCEPTED",
@@ -60,19 +60,6 @@ async function postTransition(tripId: string, vehicleId: string, status: string)
   if (error) throw error;
 }
 
-async function postVerifyOtp(
-  tripId: string,
-  vehicleId: string,
-  phase: "pickup" | "drop",
-  otp: string,
-): Promise<void> {
-  const { error } = await apiClient.POST("/v1/trips/{id}/vehicles/{vehicle_pk}/verify-otp", {
-    params: { path: { id: tripId, vehicle_pk: vehicleId } },
-    body: { phase, otp } as never,
-  });
-  if (error) throw error;
-}
-
 // Re-read the vehicle's live status so an orchestration is resilient to a partially-advanced
 // state (e.g. a previous wrong-OTP attempt already moved it to AT_PICKUP).
 async function fetchTvStatus(tripId: string, vehicleId: string, fallback: string): Promise<string> {
@@ -92,8 +79,6 @@ export default function TripsPage() {
   const [selectedTripId, setSelectedTripId] = useState<string | null>(null);
   const [showDetailDrawer, setShowDetailDrawer] = useState(false);
   const [showReassignModal, setShowReassignModal] = useState<{ tripId: string; vehicleId: string; mode: "allot" | "reassign" } | null>(null);
-  const [otpModal, setOtpModal] = useState<{ tripId: string; vehicleId: string; phase: "pickup" | "drop"; currentStatus: string } | null>(null);
-  const [otpValue, setOtpValue] = useState("");
   const [reassignVehicleId, setReassignVehicleId] = useState("");
   const [reassignDriverId, setReassignDriverId] = useState("");
   const [reassignReason, setReassignReason] = useState("");
@@ -214,19 +199,15 @@ export default function TripsPage() {
     },
   });
 
-  // Pickup: advance the vehicle to AT_PICKUP (through any intermediate driver states),
-  // verify the pickup OTP, then move it to PAX_PICKED — one click, one OTP.
+  // Pickup: advance the vehicle through the intermediate driver states up to IN_TRANSIT
+  // (passenger picked up, on the way). No OTP — one click updates the status.
   const pickupMutation = useMutation({
-    mutationFn: async ({ tripId, vehicleId, currentStatus, otp }: { tripId: string; vehicleId: string; currentStatus: string; otp: string }) => {
+    mutationFn: async ({ tripId, vehicleId, currentStatus }: { tripId: string; vehicleId: string; currentStatus: string }) => {
       const cur = await fetchTvStatus(tripId, vehicleId, currentStatus);
-      for (const s of advancePath(cur, "AT_PICKUP")) await postTransition(tripId, vehicleId, s);
-      await postVerifyOtp(tripId, vehicleId, "pickup", otp);
-      await postTransition(tripId, vehicleId, "PAX_PICKED");
+      for (const s of advancePath(cur, "IN_TRANSIT")) await postTransition(tripId, vehicleId, s);
     },
     onSuccess: () => {
       addToast("Passenger picked up", "success");
-      setOtpModal(null);
-      setOtpValue("");
       void qc.invalidateQueries({ queryKey: keys.trips.all() });
     },
     onError: (err) => {
@@ -234,20 +215,15 @@ export default function TripsPage() {
     },
   });
 
-  // Drop: advance to AT_DROP (through IN_TRANSIT), verify the drop OTP, then PAX_DROPPED →
-  // COMPLETED, ending the trip — one click, one OTP.
+  // Drop: advance all the way to COMPLETED (through AT_DROP and PAX_DROPPED). No OTP.
+  // Completing the trip emits trip.completed, which billing consumes to set the trip BILLED.
   const dropMutation = useMutation({
-    mutationFn: async ({ tripId, vehicleId, currentStatus, otp }: { tripId: string; vehicleId: string; currentStatus: string; otp: string }) => {
+    mutationFn: async ({ tripId, vehicleId, currentStatus }: { tripId: string; vehicleId: string; currentStatus: string }) => {
       const cur = await fetchTvStatus(tripId, vehicleId, currentStatus);
-      for (const s of advancePath(cur, "AT_DROP")) await postTransition(tripId, vehicleId, s);
-      await postVerifyOtp(tripId, vehicleId, "drop", otp);
-      await postTransition(tripId, vehicleId, "PAX_DROPPED");
-      await postTransition(tripId, vehicleId, "COMPLETED");
+      for (const s of advancePath(cur, "COMPLETED")) await postTransition(tripId, vehicleId, s);
     },
     onSuccess: () => {
-      addToast("Trip completed", "success");
-      setOtpModal(null);
-      setOtpValue("");
+      addToast("Trip completed — billing generated", "success");
       void qc.invalidateQueries({ queryKey: keys.trips.all() });
     },
     onError: (err) => {
@@ -332,15 +308,6 @@ export default function TripsPage() {
     },
   });
 
-  const handleOtpSubmit = () => {
-    if (!otpModal || !otpValue.trim()) return;
-    if (otpModal.phase === "pickup") {
-      pickupMutation.mutate({ ...otpModal, otp: otpValue });
-    } else {
-      dropMutation.mutate({ ...otpModal, otp: otpValue });
-    }
-  };
-
   const columns: Column<Trip>[] = [
     {
       key: "id", header: t("tripId", language),
@@ -393,7 +360,6 @@ export default function TripsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold text-text-primary">{t("trips", language)}</h2>
         <p className="text-sm text-text-muted mt-1">
           {trips.length} {t("tripsAssignedToFleet", language)}
         </p>
@@ -551,6 +517,28 @@ export default function TripsPage() {
                           </span>
                         </div>
 
+                        {(() => {
+                          // reassigned_at / assigned_vehicle_type_name aren't in the generated
+                          // schema yet — read via cast, same pattern used elsewhere in this file.
+                          const reassignInfo = tv as unknown as {
+                            reassigned_at?: string | null;
+                            assigned_vehicle_type_name?: string | null;
+                          };
+                          if (!reassignInfo.reassigned_at) return null;
+                          // The vehicle actually on the road now — may differ from the
+                          // originally-booked "Vehicle needed" type above (an operational swap).
+                          const currentType =
+                            reassignInfo.assigned_vehicle_type_name || tv.vehicle_type_name;
+                          return (
+                            <div className="flex items-center gap-1.5 px-2 py-1 text-xs bg-amber-50 text-amber-700 border border-amber-200 rounded-md w-fit">
+                              <RefreshCw className="w-3 h-3 shrink-0" />
+                              <span className="font-semibold">Reassigned</span>
+                              {currentType && <span>— {currentType}</span>}
+                              {tv.driver_name && <span>· {tv.driver_name}</span>}
+                            </div>
+                          );
+                        })()}
+
                         {tv.vehicle && (
                           <p className="text-xs text-text-muted">
                             Fleet Vehicle: <span className="font-mono text-text-primary">{tv.vehicle_plate ?? tv.vehicle}</span>
@@ -567,46 +555,24 @@ export default function TripsPage() {
                           </p>
                         )}
 
-                        {(() => {
-                          // pickup_otp/drop_otp aren't in the generated schema yet — read via cast.
-                          const otp = tv as unknown as { pickup_otp?: string; drop_otp?: string };
-                          if (!otp.pickup_otp && !otp.drop_otp) return null;
-                          return (
-                            <div className="flex flex-wrap gap-4 mt-1 p-2 bg-brand-blue/5 rounded-lg border border-brand-blue/10">
-                              {otp.pickup_otp && (
-                                <div className="text-xs">
-                                  <span className="text-text-muted">Pickup OTP: </span>
-                                  <span className="font-mono font-bold text-brand-blue tracking-widest">{otp.pickup_otp}</span>
-                                </div>
-                              )}
-                              {otp.drop_otp && (
-                                <div className="text-xs">
-                                  <span className="text-text-muted">Drop OTP: </span>
-                                  <span className="font-mono font-bold text-brand-blue tracking-widest">{otp.drop_otp}</span>
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })()}
-
                         {(canPickup || canDrop || canComplete) && (
                           <div className="flex flex-wrap gap-2 pt-1">
                             {canPickup && (
                               <button
-                                onClick={() => setOtpModal({ tripId: tripDetail.id, vehicleId: tv.id, phase: "pickup", currentStatus })}
+                                onClick={() => pickupMutation.mutate({ tripId: tripDetail.id, vehicleId: tv.id, currentStatus })}
                                 disabled={pickupMutation.isPending}
                                 className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg font-medium bg-brand-blue/10 text-brand-blue border border-brand-blue/20 hover:bg-brand-blue/20 transition-colors disabled:opacity-50"
                               >
-                                <Key className="w-3 h-3" /> {pickupMutation.isPending ? "Picking up…" : "Passenger Pickup"}
+                                <MapPin className="w-3 h-3" /> {pickupMutation.isPending ? "Picking up…" : "Pickup"}
                               </button>
                             )}
                             {canDrop && (
                               <button
-                                onClick={() => setOtpModal({ tripId: tripDetail.id, vehicleId: tv.id, phase: "drop", currentStatus })}
+                                onClick={() => dropMutation.mutate({ tripId: tripDetail.id, vehicleId: tv.id, currentStatus })}
                                 disabled={dropMutation.isPending}
                                 className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition-colors disabled:opacity-50"
                               >
-                                <Key className="w-3 h-3" /> {dropMutation.isPending ? "Completing…" : "Passenger Drop"}
+                                <CheckCircle className="w-3 h-3" /> {dropMutation.isPending ? "Completing…" : "Drop"}
                               </button>
                             )}
                             {canComplete && (
@@ -731,51 +697,6 @@ export default function TripsPage() {
         </Modal>
       )}
 
-      {/* OTP MODAL */}
-      {otpModal && (
-        <Modal
-          open={!!otpModal}
-          onClose={() => { setOtpModal(null); setOtpValue(""); }}
-          title={`OTP Verification — ${otpModal.phase.charAt(0).toUpperCase() + otpModal.phase.slice(1)}`}
-        >
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 p-3 bg-brand-blue/5 rounded-lg">
-              <Key className="w-4 h-4 text-brand-blue" />
-              <p className="text-sm text-text-primary">Enter the OTP provided by the passenger to confirm {otpModal.phase}.</p>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-text-primary mb-2">OTP Code</label>
-              <input
-                type="text"
-                value={otpValue}
-                onChange={(e) => setOtpValue(e.target.value)}
-                placeholder="Enter OTP…"
-                maxLength={6}
-                className="w-full px-3 py-2 bg-page-bg border border-border rounded-lg text-sm text-text-primary font-mono tracking-widest focus:outline-none focus:ring-2 focus:ring-brand-blue/30 text-center text-lg"
-              />
-            </div>
-            <div className="flex gap-3 pt-2">
-              <button
-                onClick={handleOtpSubmit}
-                disabled={!otpValue.trim() || pickupMutation.isPending || dropMutation.isPending}
-                className="flex-1 px-4 py-2.5 bg-success text-white rounded-lg font-medium text-sm hover:bg-success/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                {pickupMutation.isPending || dropMutation.isPending
-                  ? "Confirming…"
-                  : otpModal.phase === "pickup"
-                    ? "Confirm Pickup"
-                    : "Confirm Drop & Complete"}
-              </button>
-              <button
-                onClick={() => { setOtpModal(null); setOtpValue(""); }}
-                className="px-4 py-2.5 border border-border text-text-primary rounded-lg font-medium text-sm hover:bg-ops-bg transition-colors"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </Modal>
-      )}
     </div>
   );
 }

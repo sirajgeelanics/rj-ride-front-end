@@ -247,7 +247,6 @@ export default function FleetPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold text-text-primary">{t("fleet", language)}</h2>
         <p className="text-sm text-text-muted mt-1">Manage your vehicles and drivers</p>
       </div>
 

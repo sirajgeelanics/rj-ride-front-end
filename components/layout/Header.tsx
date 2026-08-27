@@ -4,7 +4,6 @@ import React, { useState } from "react";
 import { Bell, Menu } from "lucide-react";
 import { useAuth } from "@/lib/shared";
 import { NotificationDrawer } from "@/components/notifications/NotificationDrawer";
-import { LanguageToggle } from "@/components/ui/LanguageToggle";
 
 interface HeaderProps {
   title: string;
@@ -35,12 +34,10 @@ export const Header: React.FC<HeaderProps> = ({ title, onToggleMobile }) => {
         >
           <Menu className="w-5 h-5 text-text-secondary" />
         </button>
-        <h1 className="display-serif text-xl text-text-primary tracking-tight">{title}</h1>
+        <h1 className="display-serif text-2xl text-text-primary tracking-tight">{title}</h1>
       </div>
 
       <div className="flex items-center gap-3 lg:gap-4">
-        <LanguageToggle />
-
         <button
           onClick={() => setShowNotifications(true)}
           className="relative p-2 hover:bg-table-header rounded-md transition-colors"
