@@ -26,7 +26,7 @@ export const TopBar: React.FC = () => {
         .join("")
         .slice(0, 2)
         .toUpperCase()
-    : (user?.email ?? "Op").split("@")[0].slice(0, 2).toUpperCase();
+    : ((user?.email ?? "Op").split("@")[0] ?? "Op").slice(0, 2).toUpperCase();
 
   return (
     // FL8 header: sticky, compact (h-14), hairline bottom border, translucent cream with backdrop blur.

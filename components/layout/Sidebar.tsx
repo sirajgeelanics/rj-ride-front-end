@@ -22,7 +22,7 @@ export const NAV_ITEMS = [
   { labelKey: "dashboard" as const, icon: LayoutDashboard, href: "/" },
   { labelKey: "pricingAndQuotes" as const, icon: Tags, href: "/pricing" },
   { labelKey: "tripRequests" as const, icon: Route, href: "/trips" },
-  { labelKey: "Automated Trips" as const, icon: Inbox, href: "/ritmo" },
+  { labelKey: "automatedTrips" as const, icon: Inbox, href: "/ritmo" },
   // { labelKey: "dispatch" as const, icon: Radio, href: "/dispatch" },
   { labelKey: "tracking" as const, icon: MapPin, href: "/tracking" },
   { labelKey: "billing" as const, icon: Receipt, href: "/billing" },

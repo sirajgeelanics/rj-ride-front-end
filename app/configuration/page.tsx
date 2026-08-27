@@ -30,7 +30,7 @@ export default function ConfigurationPage() {
         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-text-secondary" />
         <input
           type="text"
-          placeholder={t("Search By Vendor,Cutomer,Vehicle type....", language)}
+          placeholder="Search by vendor, customer, vehicle type..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="w-full pl-10 pr-9 py-2 bg-white border border-border rounded-lg text-sm text-text-primary placeholder-text-secondary focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-transparent"

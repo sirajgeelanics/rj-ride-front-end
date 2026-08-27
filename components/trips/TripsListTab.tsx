@@ -210,7 +210,7 @@ export const TripsListTab: React.FC = () => {
                     {trip.customer_name && (
                       <span className="text-sm text-text-secondary truncate">· {trip.customer_name}</span>
                     )}
-                    {trip.created_via === "RITMO" && (
+                    {(trip.created_via === "API_PAX" || trip.created_via === "API_VEHICLE_COUNT") && (
                       <span className="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-brand-blue/10 text-brand-blue">
                         RITMO
                       </span>
