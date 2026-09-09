@@ -518,6 +518,20 @@ export default function TripsPage() {
                         </div>
 
                         {(() => {
+                          // distance_km isn't in the generated schema yet — read via cast, same
+                          // pattern used below for pickup_otp/drop_otp. Quoted on the original
+                          // offer, not recomputed per reassignment.
+                          const distanceKm = (tv as unknown as { distance_km?: string | null })
+                            .distance_km;
+                          if (!distanceKm) return null;
+                          return (
+                            <p className="text-xs text-text-muted">
+                              Distance: <span className="font-semibold text-text-primary">{distanceKm} km</span>
+                            </p>
+                          );
+                        })()}
+
+                        {(() => {
                           // reassigned_at / assigned_vehicle_type_name aren't in the generated
                           // schema yet — read via cast, same pattern used elsewhere in this file.
                           const reassignInfo = tv as unknown as {
@@ -549,6 +563,42 @@ export default function TripsPage() {
                             Driver: <span className="font-mono text-text-primary">{tv.driver_name ?? tv.driver}</span>
                           </p>
                         )}
+
+                        {(() => {
+                          // pickup_otp/drop_otp aren't in the generated schema yet — read via
+                          // cast, same pattern used above for reassigned_at. Temporary: there's
+                          // no passenger SMS channel yet, so the raw codes are surfaced here for
+                          // the driver-app developer to test pickup/drop OTP verification against.
+                          const otpInfo = tv as unknown as { pickup_otp?: string; drop_otp?: string };
+                          if (!otpInfo.pickup_otp && !otpInfo.drop_otp) return null;
+                          return (
+                            <div className="flex items-center gap-2 flex-wrap">
+                              {otpInfo.pickup_otp && (
+                                <span
+                                  className={`px-2 py-1 text-xs font-mono font-semibold rounded-md border ${
+                                    tv.pickup_verified
+                                      ? "bg-success/10 text-success border-success/30 line-through"
+                                      : "bg-brand-blue/10 text-brand-blue border-brand-blue/20"
+                                  }`}
+                                >
+                                  Pickup OTP: {otpInfo.pickup_otp}
+                                </span>
+                              )}
+                              {otpInfo.drop_otp && (
+                                <span
+                                  className={`px-2 py-1 text-xs font-mono font-semibold rounded-md border ${
+                                    tv.drop_verified
+                                      ? "bg-success/10 text-success border-success/30 line-through"
+                                      : "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                  }`}
+                                >
+                                  Drop OTP: {otpInfo.drop_otp}
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })()}
+
                         {tv.locked_price != null && tv.currency && (
                           <p className="text-sm font-semibold text-text-primary">
                             {formatMoney(tv.locked_price, tv.currency)}

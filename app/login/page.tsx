@@ -3,12 +3,12 @@
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth, useLanguageStore, t } from "@/lib/shared";
-import { Truck, Globe } from "lucide-react";
+import { Truck } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
   const { login, isAuthenticated } = useAuth();
-  const { language, toggleLanguage } = useLanguageStore();
+  const { language } = useLanguageStore();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -44,17 +44,6 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-page-bg">
-      <div className="absolute top-6 right-6">
-        <button
-          onClick={toggleLanguage}
-          className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white border border-border hover:bg-gray-50 transition-colors text-sm font-medium text-text-primary"
-          title={t("toggleLanguage", language)}
-        >
-          <Globe className="w-4 h-4 text-text-muted" />
-          <span>{language.toUpperCase()}</span>
-        </button>
-      </div>
-
       <div className="bg-card-bg rounded-xl shadow-lg border border-border p-10 w-full max-w-md">
         <div className="flex flex-col items-center mb-8">
           <div className="w-16 h-16 bg-sidebar-bg rounded-xl flex items-center justify-center mb-4">

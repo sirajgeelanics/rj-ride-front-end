@@ -297,7 +297,7 @@ export default function AlertsPage() {
         </p>
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className={`rounded-xl p-4 border ${highCount > 0 ? "bg-danger/5 border-danger/20" : "bg-card-bg border-card-border"}`}>
           <p className="text-xs text-text-muted uppercase tracking-wider">High</p>
           <p className={`text-2xl font-bold mt-1 ${highCount > 0 ? "text-danger" : "text-text-primary"}`}>{highCount}</p>

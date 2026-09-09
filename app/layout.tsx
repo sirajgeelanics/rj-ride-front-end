@@ -44,7 +44,10 @@ function RealtimeSync() {
       "trip.updated": keys.trips.all(),
       "trip.cancelled": keys.trips.all(),
       "trip.completed": keys.trips.all(),
-      "trip.assigned": keys.trips.all(),
+      // The actual WS event a direct assignment (RITMO auto-dispatch/manual-allot, ops's own
+      // "Assign vehicle & driver") or our own accept_offer() fires — see ws.ts for why this is
+      // NOT "trip.assigned" (that string is only ever used by the RITMO outbound webhook).
+      "trip.vehicle.assigned": keys.trips.all(),
       // The vendor-offer lifecycle. The server already forwards these WS-side and filters them
       // by payload.vendor_id, but the portal was not listening — so a new or alerted offer only
       // surfaced via the Offers page's 15s poll, and not at all from any other page.
@@ -52,6 +55,10 @@ function RealtimeSync() {
       "trip.offer_alerted": VENDOR_OFFERS_KEY,
       "trip.offer_expired": VENDOR_OFFERS_KEY,
       "trip.offer_withdrawn": VENDOR_OFFERS_KEY,
+      // A trip we'd already accepted got reassigned to a different vendor by ops — it drops
+      // out of our own trips list the moment this lands, and a matching in-app notification
+      // was recorded server-side (notifications/routing.py) too.
+      "trip.vehicle.withdrawn_from_vendor": keys.trips.all(),
       "billing.invoice_created": keys.billing.all(),
       "billing.invoice_updated": keys.billing.all(),
     },
@@ -62,18 +69,33 @@ function RealtimeSync() {
       }
       // The alert is also recorded as an in-app notification (notifications/routing.py), so pull
       // the Alerts feed forward too rather than leaving it to its 30s poll.
-      if (event.type.startsWith("trip.offer_")) {
+      if (
+        event.type.startsWith("trip.offer_") ||
+        event.type === "trip.vehicle.withdrawn_from_vendor" ||
+        event.type === "trip.vehicle.assigned"
+      ) {
         void qc.invalidateQueries({ queryKey: ["notifications", "mine"] });
       }
 
       // Offers expire on a timer, so a silent cache refresh is not enough — say it out loud.
       const ref = (event as { payload?: { reference?: string } }).payload?.reference;
+      // trip.vehicle.assigned carries no human-readable reference (only trip_id, a UUID) —
+      // transition_vehicle's payload does carry vehicle_number, which reads fine standalone.
+      const vehicleNumber = (event as { payload?: { vehicle_number?: string } }).payload
+        ?.vehicle_number;
       if (event.type === "trip.offer_made") {
         addToast(`New trip offer${ref ? ` ${ref}` : ""} — accept before it expires.`, "info");
       } else if (event.type === "trip.offer_alerted") {
         addToast(`Reminder: offer${ref ? ` ${ref}` : ""} is still awaiting your response.`, "error");
       } else if (event.type === "trip.offer_expired") {
         addToast(`Offer${ref ? ` ${ref}` : ""} expired and went back to the agency.`, "info");
+      } else if (event.type === "trip.vehicle.withdrawn_from_vendor") {
+        addToast(`Trip${ref ? ` ${ref}` : ""} was reassigned to a different vendor.`, "error");
+      } else if (event.type === "trip.vehicle.assigned") {
+        // Fires for BOTH a direct assignment and our own accept_offer() — a toast on the
+        // latter is harmless (we just clicked "accept", we know), so no actor-based filtering
+        // is needed client-side the way resolve_direct_assignment_vendor_inapp does server-side.
+        addToast(`Trip assigned${vehicleNumber ? ` — ${vehicleNumber}` : ""}.`, "success");
       }
     },
   });
@@ -178,6 +200,12 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
+      <head>
+        {/* Without this, mobile browsers render at a virtual desktop width and shrink the
+            page to fit — every lg:/mobile-responsive class below would be moot on a real
+            phone, since it would never actually see a narrow viewport to switch on. */}
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+      </head>
       <body className="min-h-screen bg-page-bg">
         <ApiProviders>
           <ErrorBoundary>

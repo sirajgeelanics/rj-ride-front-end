@@ -13,11 +13,18 @@ type Trip = components["schemas"]["TripRequest"];
 type Vehicle = components["schemas"]["Vehicle"];
 type Driver = components["schemas"]["Driver"];
 
-const ACTIVE_STATUSES = new Set([
+// These are apps.trips.models.TripVehicle.Status values — a TripRequest's own .status is the
+// coarser 7-state (DRAFT/CONFIRMED/ASSIGNED/IN_PROGRESS/COMPLETED/BILLED/CANCELLED) and can
+// never equal any of these, so they must be checked per-vehicle, not against trip.status.
+const ACTIVE_VEHICLE_STATUSES = new Set([
   "EN_ROUTE_PICKUP", "AT_PICKUP", "PAX_PICKED", "IN_TRANSIT", "AT_DROP",
 ]);
 
-const NEEDS_ATTENTION_STATUSES = new Set(["ASSIGNED", "DRIVER_ACCEPTED"]);
+const ATTENTION_VEHICLE_STATUSES = new Set(["ASSIGNED", "DRIVER_ACCEPTED"]);
+
+function hasVehicleInStatus(trip: Trip, statuses: Set<string>): boolean {
+  return (trip.vehicles ?? []).some((v) => statuses.has(v.status));
+}
 
 export default function DashboardPage() {
   const { user } = useSession();
@@ -57,9 +64,9 @@ export default function DashboardPage() {
 
   const today = new Date().toDateString();
   const tripsToday = trips.filter((t) => new Date(t.created_at).toDateString() === today).length;
-  const activeNow = trips.filter((t) => ACTIVE_STATUSES.has(t.status)).length;
-  const needingAttention = trips.filter((t) => NEEDS_ATTENTION_STATUSES.has(t.status));
-  const activeTrips = trips.filter((t) => ACTIVE_STATUSES.has(t.status));
+  const activeTrips = trips.filter((t) => hasVehicleInStatus(t, ACTIVE_VEHICLE_STATUSES));
+  const needingAttention = trips.filter((t) => hasVehicleInStatus(t, ATTENTION_VEHICLE_STATUSES));
+  const activeNow = activeTrips.length;
 
   const totalDrivers = drivers.length;
   const availableDrivers = drivers.filter((d) => d.is_active !== false && d.status === "AVAILABLE").length;

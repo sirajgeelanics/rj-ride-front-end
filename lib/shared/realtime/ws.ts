@@ -9,10 +9,20 @@ export type TripEvent =
   | { type: "trip.updated"; tripId: string; payload: Record<string, unknown> }
   | { type: "trip.cancelled"; tripId: string; payload: Record<string, unknown> }
   | { type: "trip.completed"; tripId: string; payload: Record<string, unknown> }
-  | { type: "trip.assigned"; tripId: string; payload: Record<string, unknown> };
+  // The event the server actually broadcasts over WS for a vehicle landing on us — direct
+  // assignment (RITMO auto-dispatch/manual-allot, ops's own "Assign vehicle & driver") or our
+  // own accept_offer(). "trip.assigned" is a DIFFERENT, unrelated string: only the RITMO
+  // outbound-webhook translation (apps.partner_api.public_events) uses it — the WS layer never
+  // sends it, so a union member and invalidationMap/handler keyed on it would silently never
+  // fire.
+  | { type: "trip.vehicle.assigned"; tripId: string; payload: Record<string, unknown> }
+  // An admin reassignment moved a trip-vehicle we'd already accepted to a different vendor's
+  // fleet (apps.trips.services.reassign_vehicle) — it drops out of our own trips list the
+  // moment this lands.
+  | { type: "trip.vehicle.withdrawn_from_vendor"; tripId: string; payload: Record<string, unknown> };
 
 // Vendor allocation offer cycle (BE-18): an offer is made to a vendor, alerted near its
-// response deadline, then either accepted (→ trip.assigned), withdrawn, or expired.
+// response deadline, then either accepted (→ trip.vehicle.assigned), withdrawn, or expired.
 export type OfferEvent =
   | { type: "trip.offer_made"; tripId: string; payload: Record<string, unknown> }
   | { type: "trip.offer_alerted"; tripId: string; payload: Record<string, unknown> }

@@ -181,7 +181,9 @@ export default function OffersPage() {
         .filter((v) => v.is_active !== false)
         .map((v) => ({
           value: v.id,
-          label: `${v.plate} · ${v.vehicle_type_name}`,
+          label: [v.plate, v.vehicle_type_name, v.vehicle_name_display]
+            .filter(Boolean)
+            .join(" · "),
           disabled: busyVehicleIds.has(v.id),
           hint: "on a trip",
         })),

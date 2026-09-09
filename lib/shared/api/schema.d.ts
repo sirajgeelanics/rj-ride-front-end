@@ -2898,6 +2898,9 @@ export interface components {
             /** Format: uuid */
             readonly vehicle_type?: string;
             readonly vehicle_type_name?: string;
+            /** Format: uuid */
+            readonly vehicle_name?: string | null;
+            readonly vehicle_name_display?: string | null;
             readonly plate?: string;
             readonly traccar_device_id?: string | null;
             readonly is_active?: boolean;
@@ -3247,6 +3250,9 @@ export interface components {
             /** Format: uuid */
             readonly vehicle_type: string;
             readonly vehicle_type_name: string;
+            /** Format: uuid */
+            readonly vehicle_name: string | null;
+            readonly vehicle_name_display: string | null;
             readonly plate: string;
             readonly traccar_device_id: string | null;
             readonly is_active: boolean;
