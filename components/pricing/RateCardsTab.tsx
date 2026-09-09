@@ -83,9 +83,10 @@ export const RateCardsTab: React.FC<RateCardsTabProps> = ({ searchQuery = "" }) 
   const { data: vehicleTypesData } = useQuery({
     queryKey: keys.config.vehicleTypes.list(),
     queryFn: async () => {
-      const { data: res, error: err } = await apiClient.GET("/v1/config/vehicle-types", {});
-      if (err) throw err;
-      return res;
+      // Single-page GET caps at the backend's default page_size=25 — the system now has
+      // more vehicle types than that, so this silently dropped types past the cutoff
+      // (alphabetically, e.g. "Sedan 4c"/"Sedan 5c") from the search and rate-card list.
+      return { results: await fetchAllPages<components["schemas"]["VehicleType"]>("/api/v1/config/vehicle-types/") };
     },
   });
 

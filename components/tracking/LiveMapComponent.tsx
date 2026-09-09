@@ -3,6 +3,7 @@
 import React, { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { markerHex } from "./markerColors";
 
 type LivePosition = {
   trip_vehicle_id: string;
@@ -30,9 +31,10 @@ L.Icon.Default.mergeOptions({
 function makeVehicleIcon(color: string, selected: boolean): L.DivIcon {
   const size = selected ? 36 : 28;
   const border = selected ? "3px solid #fff" : "2px solid rgba(255,255,255,0.6)";
+  const hex = markerHex(color);
   return L.divIcon({
     className: "",
-    html: `<div style="width:${size}px;height:${size}px;background:#${color};border-radius:50%;border:${border};box-shadow:0 2px 6px rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;">
+    html: `<div style="width:${size}px;height:${size}px;background:${hex};border-radius:50%;border:${border};box-shadow:0 2px 6px rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;">
       <svg width="${size * 0.55}" height="${size * 0.55}" viewBox="0 0 24 24" fill="white"><path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.22.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm11 0c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/></svg>
     </div>`,
     iconSize: [size, size],
@@ -105,7 +107,14 @@ const LiveMapComponent: React.FC<LiveMapComponentProps> = ({
     if (selectedTripVehicleId) {
       const selectedPos = positions.find((p) => p.trip_vehicle_id === selectedTripVehicleId);
       if (selectedPos?.lat != null && selectedPos.lng != null) {
-        map.panTo([selectedPos.lat, selectedPos.lng], { animate: true });
+        // A real "focus", not just a pan: also zoom in (never zoom OUT past the current level —
+        // clicking a vehicle you're already zoomed past shouldn't pull back) and pop its info
+        // open, the way clicking a place on Google Maps centers, zooms, and opens its card.
+        map.flyTo([selectedPos.lat, selectedPos.lng], Math.max(map.getZoom(), 15), {
+          animate: true,
+          duration: 0.6,
+        });
+        markersRef.current.get(selectedTripVehicleId)?.openPopup();
       }
     } else if (positions.length > 0 && markersRef.current.size > 0) {
       const group = new L.FeatureGroup(Array.from(markersRef.current.values()));

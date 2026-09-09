@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiClient, keys, QueryBoundary, csrfFetch } from "@/lib/shared";
+import { fetchAllPages } from "@/hooks/useCursorPagination";
 import type { components } from "@/lib/shared/api/schema.d";
 import { Button } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -34,9 +35,10 @@ export const VehicleTypesTab: React.FC<VehicleTypesTabProps> = ({ searchQuery = 
   const { data, isLoading, error } = useQuery({
     queryKey: keys.config.vehicleTypes.list(),
     queryFn: async () => {
-      const { data: res, error: err } = await apiClient.GET("/v1/config/vehicle-types", {});
-      if (err) throw err;
-      return res;
+      // Cursor-paginated at 25/page — with the full catalogue now past that, a single-page
+      // fetch silently drops everything past the first page (the most recently created 25).
+      // Follow every cursor so no type — old or new — goes missing from this list.
+      return { results: await fetchAllPages<VehicleType>("/api/v1/config/vehicle-types/") };
     },
   });
 

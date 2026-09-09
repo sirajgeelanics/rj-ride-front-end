@@ -668,6 +668,73 @@ export interface paths {
         patch: operations["config_vehicle_types_partial_update"];
         trace?: never;
     };
+    "/v1/config/vehicle-names": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description List/retrieve from the ORM; create/update/destroy delegated to services.
+         *
+         *     DRF's ModelViewSet writes through the serializer, which would put .save() calls in the
+         *     view layer. This keeps the read machinery (pagination, filtering, get_object) and routes
+         *     every mutation into apps.fleet.services instead.
+         */
+        get: operations["config_vehicle_names_list"];
+        put?: never;
+        /**
+         * @description List/retrieve from the ORM; create/update/destroy delegated to services.
+         *
+         *     DRF's ModelViewSet writes through the serializer, which would put .save() calls in the
+         *     view layer. This keeps the read machinery (pagination, filtering, get_object) and routes
+         *     every mutation into apps.fleet.services instead.
+         */
+        post: operations["config_vehicle_names_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/config/vehicle-names/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description List/retrieve from the ORM; create/update/destroy delegated to services.
+         *
+         *     DRF's ModelViewSet writes through the serializer, which would put .save() calls in the
+         *     view layer. This keeps the read machinery (pagination, filtering, get_object) and routes
+         *     every mutation into apps.fleet.services instead.
+         */
+        get: operations["config_vehicle_names_retrieve"];
+        put?: never;
+        post?: never;
+        /**
+         * @description List/retrieve from the ORM; create/update/destroy delegated to services.
+         *
+         *     DRF's ModelViewSet writes through the serializer, which would put .save() calls in the
+         *     view layer. This keeps the read machinery (pagination, filtering, get_object) and routes
+         *     every mutation into apps.fleet.services instead.
+         */
+        delete: operations["config_vehicle_names_destroy"];
+        options?: never;
+        head?: never;
+        /**
+         * @description List/retrieve from the ORM; create/update/destroy delegated to services.
+         *
+         *     DRF's ModelViewSet writes through the serializer, which would put .save() calls in the
+         *     view layer. This keeps the read machinery (pagination, filtering, get_object) and routes
+         *     every mutation into apps.fleet.services instead.
+         */
+        patch: operations["config_vehicle_names_partial_update"];
+        trace?: never;
+    };
     "/v1/config/vendors": {
         parameters: {
             query?: never;
@@ -2755,6 +2822,19 @@ export interface components {
             previous?: string | null;
             results: components["schemas"]["VehicleType"][];
         };
+        PaginatedVehicleNameList: {
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?cursor=cD00ODY%3D"
+             */
+            next?: string | null;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?cursor=cj0xJnA9NDg3
+             */
+            previous?: string | null;
+            results: components["schemas"]["VehicleName"][];
+        };
         PaginatedVendorEarningsList: {
             /**
              * Format: uri
@@ -2898,9 +2978,22 @@ export interface components {
             /** Format: uuid */
             readonly vehicle_type?: string;
             readonly vehicle_type_name?: string;
+            /** Format: uuid */
+            readonly vehicle_name?: string | null;
+            readonly vehicle_name_display?: string | null;
             readonly plate?: string;
             readonly traccar_device_id?: string | null;
             readonly is_active?: boolean;
+            /** Format: date-time */
+            readonly created_at?: string;
+        };
+        PatchedVehicleName: {
+            /** Format: uuid */
+            readonly id?: string;
+            /** Format: uuid */
+            readonly vehicle_type?: string;
+            readonly vehicle_type_name?: string;
+            readonly name?: string;
             /** Format: date-time */
             readonly created_at?: string;
         };
@@ -3247,9 +3340,22 @@ export interface components {
             /** Format: uuid */
             readonly vehicle_type: string;
             readonly vehicle_type_name: string;
+            /** Format: uuid */
+            readonly vehicle_name: string | null;
+            readonly vehicle_name_display: string | null;
             readonly plate: string;
             readonly traccar_device_id: string | null;
             readonly is_active: boolean;
+            /** Format: date-time */
+            readonly created_at: string;
+        };
+        VehicleName: {
+            /** Format: uuid */
+            readonly id: string;
+            /** Format: uuid */
+            readonly vehicle_type: string;
+            readonly vehicle_type_name: string;
+            readonly name: string;
             /** Format: date-time */
             readonly created_at: string;
         };
@@ -4328,6 +4434,129 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["VehicleType"];
+                };
+            };
+        };
+    };
+    config_vehicle_names_list: {
+        parameters: {
+            query?: {
+                /** @description The pagination cursor value. */
+                cursor?: string;
+                name?: string;
+                /** @description Number of results to return per page. */
+                page_size?: number;
+                /** Format: uuid */
+                vehicle_type?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedVehicleNameList"];
+                };
+            };
+        };
+    };
+    config_vehicle_names_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["VehicleName"];
+                "application/x-www-form-urlencoded": components["schemas"]["VehicleName"];
+                "multipart/form-data": components["schemas"]["VehicleName"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VehicleName"];
+                };
+            };
+        };
+    };
+    config_vehicle_names_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A UUID string identifying this vehicle name. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VehicleName"];
+                };
+            };
+        };
+    };
+    config_vehicle_names_destroy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A UUID string identifying this vehicle name. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    config_vehicle_names_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A UUID string identifying this vehicle name. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PatchedVehicleName"];
+                "application/x-www-form-urlencoded": components["schemas"]["PatchedVehicleName"];
+                "multipart/form-data": components["schemas"]["PatchedVehicleName"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VehicleName"];
                 };
             };
         };

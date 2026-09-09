@@ -37,18 +37,28 @@ export const Modal: React.FC<ModalProps> = ({ open, onClose, title, children, si
     return () => window.removeEventListener("keydown", handleEscape);
   }, [open, onClose]);
 
-  if (!open) return null;
-
+  // Deliberately never unmounts (no `if (!open) return null`) — for the call sites that already
+  // pass a stable `open` prop to an always-rendered <Modal> (ConfirmDialog, the common case),
+  // unmounting the instant `open` goes false would leave nothing for a CSS transition to
+  // animate; it would just vanish. Opacity + scale classes driven by `open` make both the open
+  // AND close transitions actually play. (Call sites that additionally wrap <Modal> itself in
+  // `{state && <Modal open .../>}` still snap shut on close — that outer conditional unmounts
+  // the whole thing regardless of what happens in here; only fixable at each of those call
+  // sites individually.)
   return (
     <div
       // Frosted backdrop, matching Drawer. `bg-[#072D62] bg-opacity-50` read as a flat blackout and
       // is Tailwind v3 syntax besides; the slash-opacity + backdrop-blur keeps the page legible
       // behind the dialog. z-[60] is explicit so it doesn't rely on a non-default `z-60` class.
-      className="fixed inset-0 bg-[#072D62]/40 backdrop-blur-sm flex items-center justify-center z-[60]"
+      className={`fixed inset-0 bg-[#072D62]/40 backdrop-blur-sm flex items-center justify-center z-[60] transition-opacity duration-200 ${
+        open ? "opacity-100" : "opacity-0 pointer-events-none"
+      }`}
       onClick={onClose}
     >
       <div
-        className={`${sizeMap[size]} bg-white rounded-xl border border-border shadow-xl flex flex-col max-h-[90vh] overflow-hidden animate-scale-in`}
+        className={`${sizeMap[size]} bg-white rounded-xl border border-border shadow-xl flex flex-col max-h-[90vh] overflow-hidden transition-transform duration-200 ${
+          open ? "scale-100" : "scale-95"
+        }`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between p-4 border-b border-border bg-ops-sidebar">

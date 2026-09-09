@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { X } from "lucide-react";
+import { ChevronDown, X } from "lucide-react";
 
 interface Option {
   value: string;
@@ -21,6 +21,9 @@ interface SearchableSelectProps {
   className?: string;
   /** Show a ✕ to reset the selection to "" once a value is chosen (for filters). */
   clearable?: boolean;
+  /** Same intent as a native <select disabled> — e.g. "pick a type first" before this field
+   * makes sense. Blocks focus/typing entirely rather than just greying out the label. */
+  disabled?: boolean;
 }
 
 /**
@@ -36,6 +39,7 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
   placeholder = "Search…",
   className = "",
   clearable = false,
+  disabled = false,
 }) => {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -121,6 +125,7 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
     <div ref={rootRef} className={`relative ${className}`}>
       <input
         type="text"
+        disabled={disabled}
         value={open ? query : selectedLabel}
         placeholder={selectedLabel || placeholder}
         onFocus={() => {
@@ -150,8 +155,16 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
             setQuery("");
           }
         }}
-        className={`w-full px-3 py-2 bg-white border border-border rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-transparent ${showClear ? "pr-8" : ""}`}
+        className={`w-full px-3 py-2 bg-white border border-border rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-ops-card2 pr-8`}
       />
+      {/* A plain text input doesn't read as "click me, I'm a dropdown" — the chevron is the
+          visual cue. Hidden behind the clear ✕ (same corner) once there's a selection to clear;
+          pointer-events-none so it never steals the click meant for the input beneath it. */}
+      {!showClear && !disabled && (
+        <ChevronDown
+          className={`w-4 h-4 absolute right-2.5 top-1/2 -translate-y-1/2 text-text-tertiary pointer-events-none transition-transform ${open ? "rotate-180" : ""}`}
+        />
+      )}
       {showClear && (
         <button
           type="button"

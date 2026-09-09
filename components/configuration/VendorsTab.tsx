@@ -12,6 +12,7 @@ import { Drawer } from "@/components/ui/Drawer";
 import { Input } from "@/components/ui/Input";
 import { FormField } from "@/components/ui/FormField";
 import { PII } from "@/components/ui/PII";
+import { VendorLoginPanel } from "@/components/configuration/VendorLoginPanel";
 import { useToastStore } from "@/stores/toastStore";
 
 type Vendor = components["schemas"]["Vendor"];
@@ -24,7 +25,8 @@ interface VendorWriteInput {
   contact_email?: string;
   airport_code?: string;
   address?: string;
-  // Vendor-portal login password. Omitted -> unchanged on edit / default on create.
+  // Vendor-portal login password — the admin-chosen final value, never generated. Omitted ->
+  // unchanged on edit; required on create whenever contact_email is set.
   password?: string;
 }
 
@@ -164,10 +166,14 @@ export const VendorsTab: React.FC<VendorsTabProps> = ({ searchQuery = "" }) => {
       addToast(t("vendorNameRequired", language), "error");
       return;
     }
-    // Email is required: it becomes the vendor's portal login (auto-provisioned on create).
+    // Email is required: it becomes the vendor's portal login (provisioned on create).
     const email = (formData.contact_email ?? "").trim();
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       addToast("A valid contact email is required — it becomes the vendor's login.", "error");
+      return;
+    }
+    if (!editingId && (formData.password ?? "").trim().length < 8) {
+      addToast("A portal password (min 8 characters) is required to create this vendor's login.", "error");
       return;
     }
     const airportCode = (formData.airport_code ?? "").trim();
@@ -310,20 +316,22 @@ export const VendorsTab: React.FC<VendorsTabProps> = ({ searchQuery = "" }) => {
             <p className="text-xs text-text-secondary mt-1">Becomes the vendor&apos;s portal login username. Set the password below.</p>
           </FormField>
 
-          <FormField label="Portal Password">
-            <Input
-              type="password"
-              value={formData.password ?? ""}
-              onChange={(e) => setFormData({ ...formData, password: e.target.value || undefined })}
-              placeholder={editingId ? "Leave blank to keep current password" : "Min 8 characters"}
-              autoComplete="new-password"
-            />
-            <p className="text-xs text-text-secondary mt-1">
-              {editingId
-                ? "Sets a new vendor-portal login password. Leave blank to keep the current one."
-                : "Vendor-portal login password. Leave blank to use the default (Vendor@12345)."}
-            </p>
-          </FormField>
+          {!editingId && (
+            <FormField label="Portal Password" required>
+              <Input
+                type="password"
+                value={formData.password ?? ""}
+                onChange={(e) => setFormData({ ...formData, password: e.target.value || undefined })}
+                placeholder="Min 8 characters — this is the final password"
+                autoComplete="new-password"
+              />
+              <p className="text-xs text-text-secondary mt-1">
+                Vendor-portal login password. This is used as-is — never generated — so the vendor&apos;s login is exactly this password.
+              </p>
+            </FormField>
+          )}
+
+          {editingId && <VendorLoginPanel vendorId={editingId} vendorEmail={formData.contact_email ?? ""} />}
 
           <FormField label="Airport Code">
             <Input

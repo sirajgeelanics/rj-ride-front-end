@@ -68,8 +68,15 @@ export const PaxAssignment: React.FC<PaxAssignmentProps> = ({ vehicles, onUpdate
                 {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
               </button>
 
-              {/* Vehicle Details */}
-              {isExpanded && (
+              {/* Vehicle Details — CSS-grid expand trick (0fr -> 1fr) so it opens/closes
+                  smoothly in both directions rather than snapping; overflow-hidden clips the
+                  content mid-transition. */}
+              <div
+                className={`grid transition-[grid-template-rows] duration-300 ease-in-out ${
+                  isExpanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+                }`}
+              >
+              <div className="overflow-hidden">
                 <div className="p-3 bg-ops-bg border-t border-border space-y-3">
                   {/* Existing Pax */}
                   {vehicle.pax.length > 0 && (
@@ -147,7 +154,8 @@ export const PaxAssignment: React.FC<PaxAssignmentProps> = ({ vehicles, onUpdate
                     </div>
                   </div>
                 </div>
-              )}
+              </div>
+              </div>
             </div>
           );
         })}

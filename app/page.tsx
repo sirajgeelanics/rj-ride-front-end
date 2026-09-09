@@ -108,7 +108,7 @@ export default function DashboardPage() {
               {exceptionCount} active exception{exceptionCount !== 1 ? "s" : ""}
             </p>
             <p className="text-sm text-text-secondary mt-0.5">
-              SOS / breakdown / no-show events require immediate attention. Go to Dispatch board.
+              SOS / breakdown / no-show events require immediate attention.
             </p>
           </div>
         </div>

@@ -15,10 +15,32 @@ import { Pagination } from "@/components/ui/Pagination";
 import { ListFilterBar, EMPTY_FILTERS, type ListFilters } from "@/components/ui/ListFilterBar";
 import { useCursorPagination } from "@/hooks/useCursorPagination";
 import { useDebounced } from "@/hooks/useDebounced";
-import { BarChart3, FileText, Receipt, CreditCard, ExternalLink, CheckCircle, DollarSign, XCircle } from "lucide-react";
+import { BarChart3, FileText, Receipt, CreditCard, ExternalLink, CheckCircle, DollarSign, XCircle, ChevronDown, ChevronUp, Calendar, Building2, Car } from "lucide-react";
 
 type BillableTrip = components["schemas"]["BillableTrip"];
-type BillingLine = components["schemas"]["BillingLine"];
+interface FareBreakdownLine {
+  code: string;
+  description: string;
+  amount_minor: number;
+}
+interface FareBreakdown {
+  basis: string;
+  currency: string;
+  lines: FareBreakdownLine[];
+  subtotal_minor: number;
+  total_minor: number;
+}
+// vendor_name/vehicle_type_name/vehicle_plate/pickup_at/distance_km/fare_breakdown aren't in the
+// generated schema yet (a new backend addition) — same stale-schema workaround used elsewhere in
+// this codebase: intersect them in rather than risk a full schema regen as a side effect.
+type BillingLine = components["schemas"]["BillingLine"] & {
+  vendor_name: string | null;
+  vehicle_type_name: string | null;
+  vehicle_plate: string | null;
+  pickup_at: string | null;
+  distance_km: string | null;
+  fare_breakdown: FareBreakdown | null;
+};
 type Statement = components["schemas"]["Statement"];
 type Payout = components["schemas"]["Payout"];
 
@@ -29,13 +51,6 @@ const BILLING_TABS = [
 ] as const;
 
 type Tab = typeof BILLING_TABS[number]["id"];
-
-function toMinor(display: string, currency: string): number {
-  const n = parseFloat(display);
-  if (isNaN(n)) return 0;
-  const zeroDp = ["JPY", "KRW", "VND"];
-  return zeroDp.includes(currency) ? Math.round(n) : Math.round(n * 100);
-}
 
 export default function BillingPage() {
   const [activeTab, setActiveTab] = useState<Tab>("invoices");
@@ -71,13 +86,12 @@ export default function BillingPage() {
 }
 
 /**
- * The billing total, with the arithmetic that produced it.
- *
- * The price ops see at allotment is the vehicle's `locked_price` (frozen from the Offer at
- * booking). Billing then adds the tenant's operator fee, so the number legitimately differs and
- * looked like an unexplained increase. Adjustments are included because the backend computes
- * total = subtotal + operator_fee + adjustments — leaving them out would print a bracket that
- * does not add up to the total beside it.
+ * The arithmetic behind the billing total — deliberately kept small/muted, not hidden: the
+ * price ops see at allotment is the vehicle's `locked_price` (frozen from the Offer at booking).
+ * Billing then adds the tenant's operator fee, so the number legitimately differs and would
+ * otherwise look like an unexplained increase. Adjustments are included because the backend
+ * computes total = subtotal + operator_fee + adjustments — leaving them out would print a
+ * bracket that does not add up to the total beside it.
  */
 function TotalBreakdown({ trip }: { trip: BillableTrip }) {
   if (trip.total_minor == null) return null;
@@ -89,20 +103,14 @@ function TotalBreakdown({ trip }: { trip: BillableTrip }) {
     0,
   );
   const bps = (trip.fee_config_snapshot as { bps?: number } | null | undefined)?.bps;
-  const feeLabel = typeof bps === "number" ? `operator fee ${bps / 100}%` : "operator fee";
+  const feeLabel = typeof bps === "number" ? `fee ${bps / 100}%` : "fee";
 
   return (
-    <>
-      <span className="font-medium text-text-primary mr-2">
-        {formatMoney(trip.total_minor, currency)}
-      </span>
-      <span className="text-text-tertiary mr-2">
-        ({formatMoney(subtotal, currency)} locked + {formatMoney(fee, currency)} {feeLabel}
-        {adjustments !== 0 &&
-          ` ${adjustments > 0 ? "+" : "−"} ${formatMoney(Math.abs(adjustments), currency)} adjustments`}
-        )
-      </span>
-    </>
+    <span>
+      {formatMoney(subtotal, currency)} locked + {formatMoney(fee, currency)} {feeLabel}
+      {adjustments !== 0 &&
+        ` ${adjustments > 0 ? "+" : "−"} ${formatMoney(Math.abs(adjustments), currency)} adj.`}
+    </span>
   );
 }
 
@@ -110,12 +118,16 @@ function BillableTripsTab() {
   const addToast = useToastStore((s) => s.addToast);
   const qc = useQueryClient();
 
+  // selectedId drives which trip's detail is fetched/kept in the query cache; openId drives only
+  // the visual expand/collapse. Kept separate deliberately: clearing selectedId on close would
+  // change the query key to detail("") and null out `detail` in the very same render as the
+  // close click, so the CSS collapse below would have no content left to animate away from —
+  // it'd just snap shut. Closing only touches openId, so `detail` stays populated through the
+  // whole collapse transition (and after, until a different trip is opened).
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [openId, setOpenId] = useState<string | null>(null);
   const [voidModal, setVoidModal] = useState<{ tripId: string; lineId: string } | null>(null);
   const [voidReason, setVoidReason] = useState("");
-  const [adjustModal, setAdjustModal] = useState<{ id: string; currency: string } | null>(null);
-  const [adjustAmount, setAdjustAmount] = useState("");
-  const [adjustReason, setAdjustReason] = useState("");
 
   const [cursor, setCursor] = useState<string | undefined>(undefined);
   const [filters, setFilters] = useState<ListFilters>(EMPTY_FILTERS);
@@ -185,26 +197,6 @@ function BillableTripsTab() {
     },
   });
 
-  const adjustMutation = useMutation({
-    mutationFn: async ({ id, amount_minor, currency, reason }: { id: string; amount_minor: number; currency: string; reason: string }) => {
-      const { error: err } = await apiClient.POST("/v1/billing/billable-trips/{id}/adjust", {
-        params: { path: { id } },
-        body: { amount_minor, currency, reason } as unknown as BillableTrip,
-      });
-      if (err) throw err;
-    },
-    onSuccess: () => {
-      addToast("Adjustment applied", "success");
-      void qc.invalidateQueries({ queryKey: keys.billing.all() });
-      setAdjustModal(null);
-      setAdjustAmount("");
-      setAdjustReason("");
-    },
-    onError: (err) => {
-      addToast(isApiError(err) ? err.message : "Adjustment failed", "error");
-    },
-  });
-
   // Derived once for the expanded detail panel's itemised total.
   const detailCurrency = detail?.lines?.[0]?.currency ?? "USD";
   const detailBps = (detail?.fee_config_snapshot as { bps?: number } | null | undefined)?.bps;
@@ -227,57 +219,139 @@ function BillableTripsTab() {
         </Card>
       ) : (
         <div className="space-y-2">
-          {trips.map((trip) => (
-            <Card key={trip.id} padding="md">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-text-primary font-mono">{trip.trip_reference}</p>
-                  <p className="text-xs text-text-secondary mt-0.5">
-                    <TotalBreakdown trip={trip} />
-                    <span>{new Date(trip.created_at).toLocaleDateString()}</span>
-                  </p>
+          {trips.map((trip) => {
+            const tripLines = (trip.lines as BillingLine[] | undefined) ?? [];
+            const vendorNames = [...new Set(tripLines.map((l) => l.vendor_name).filter(Boolean))];
+            const cars = tripLines
+              .map((l) => [l.vehicle_type_name, l.vehicle_plate].filter(Boolean).join(" · "))
+              .filter(Boolean);
+            const pickupAt = tripLines.find((l) => l.pickup_at)?.pickup_at;
+            const isOpen = openId === trip.id;
+            return (
+            <Card key={trip.id} padding="md" className="hover:shadow-sm transition-shadow">
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm font-semibold text-text-primary font-mono">{trip.trip_reference}</span>
+                    <span className="text-xs text-text-tertiary">{new Date(trip.created_at).toLocaleDateString()}</span>
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                    {pickupAt && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-ops-card2 text-text-secondary text-xs">
+                        <Calendar className="w-3 h-3" /> {new Date(pickupAt).toLocaleString()}
+                      </span>
+                    )}
+                    {vendorNames.map((v) => (
+                      <span key={v} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-brand-blue/10 text-brand-blue text-xs font-medium">
+                        <Building2 className="w-3 h-3" /> {v}
+                      </span>
+                    ))}
+                    {cars.map((c) => (
+                      <span key={c} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent-gold/15 text-text-primary text-xs font-mono">
+                        <Car className="w-3 h-3 text-accent-gold" /> {c}
+                      </span>
+                    ))}
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Button size="sm" variant="ghost" onClick={() => setSelectedId(trip.id === selectedId ? null : trip.id)}>
-                    <FileText className="w-3 h-3 mr-1" /> Details
-                  </Button>
+                <div className="flex flex-col items-end gap-1.5 shrink-0">
+                  <span className="text-lg font-semibold text-text-primary whitespace-nowrap">
+                    {trip.total_minor != null ? formatMoney(trip.total_minor, trip.lines?.[0]?.currency ?? "USD") : "—"}
+                  </span>
+                  <span className="text-[11px] text-text-tertiary text-right leading-tight max-w-[240px]">
+                    <TotalBreakdown trip={trip} />
+                  </span>
                   <Button
                     size="sm"
-                    variant="ghost"
-                    onClick={() => setAdjustModal({ id: trip.id, currency: trip.lines?.[0]?.currency ?? "USD" })}
+                    variant="secondary"
+                    onClick={() => {
+                      if (isOpen) {
+                        setOpenId(null);
+                      } else {
+                        setOpenId(trip.id);
+                        setSelectedId(trip.id);
+                      }
+                    }}
                   >
-                    <DollarSign className="w-3 h-3 mr-1" /> Adjust
+                    {isOpen ? (
+                      <>
+                        <ChevronUp className="w-3.5 h-3.5" /> Hide
+                      </>
+                    ) : (
+                      <>
+                        <FileText className="w-3.5 h-3.5" /> Details
+                        <ChevronDown className="w-3.5 h-3.5" />
+                      </>
+                    )}
                   </Button>
                 </div>
               </div>
 
+              {/* CSS-grid expand trick (0fr -> 1fr) so the box opens/closes smoothly without
+                  measuring content height in JS — overflow-hidden clips it mid-transition. */}
+              <div
+                className={`grid transition-[grid-template-rows] duration-300 ease-in-out ${
+                  isOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+                }`}
+              >
+              <div className="overflow-hidden">
               {selectedId === trip.id && detail && (
                 <div className="mt-3 pt-3 border-t border-border space-y-2">
                   {(detail.lines as BillingLine[] | undefined)?.map((line, i) => (
-                    <div key={line.id ?? i} className="flex items-center justify-between text-xs">
-                      <div className="flex items-center gap-2">
-                        {line.voided && <Badge variant="red">Voided</Badge>}
-                        <span className="text-text-secondary font-mono">{line.trip_vehicle.substring(0, 8)}…</span>
-                        <span className="text-text-secondary">{line.status}</span>
+                    <div key={line.id ?? i} className="rounded-lg border border-border p-2.5 text-xs bg-white">
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {line.voided && <Badge variant="red">Voided</Badge>}
+                          <span className="text-sm font-medium text-text-primary">{line.vendor_name ?? "Unassigned"}</span>
+                          <span className="text-text-tertiary" title={line.trip_vehicle}>{line.status}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-semibold text-text-primary">
+                            {formatMoney(line.amount_minor, line.currency)}
+                          </span>
+                          {!line.voided && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="text-danger h-auto py-0.5 px-1"
+                              onClick={() => setVoidModal({ tripId: trip.id, lineId: line.id })}
+                              title="Void this line"
+                            >
+                              <XCircle className="w-3.5 h-3.5" />
+                            </Button>
+                          )}
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-text-primary">
-                          {formatMoney(line.amount_minor, line.currency)}
-                        </span>
-                        {!line.voided && (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="text-danger h-auto py-0.5 px-1 text-xs"
-                            onClick={() => setVoidModal({ tripId: trip.id, lineId: line.id })}
-                          >
-                            <XCircle className="w-3 h-3" />
-                          </Button>
+                      <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                        {(line.vehicle_type_name || line.vehicle_plate) && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent-gold/15 text-text-primary text-xs font-mono">
+                            <Car className="w-3 h-3 text-accent-gold" />
+                            {[line.vehicle_type_name, line.vehicle_plate].filter(Boolean).join(" · ")}
+                          </span>
+                        )}
+                        {line.pickup_at && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-ops-card2 text-text-secondary text-xs">
+                            <Calendar className="w-3 h-3" /> {new Date(line.pickup_at).toLocaleString()}
+                          </span>
+                        )}
+                        {line.distance_km && (
+                          <span className="px-2 py-0.5 rounded-full bg-ops-card2 text-text-secondary text-xs">
+                            {line.distance_km} km
+                          </span>
                         )}
                       </div>
+                      {line.fare_breakdown && (
+                        <div className="mt-2 p-2 rounded-md bg-ops-card2 space-y-0.5">
+                          {line.fare_breakdown.lines.map((fl, fi) => (
+                            <div key={fi} className="flex justify-between text-text-secondary">
+                              <span>{fl.description}</span>
+                              <span>{formatMoney(fl.amount_minor, line.fare_breakdown!.currency)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   ))}
-                  <div className="pt-1 border-t border-border space-y-1">
+                  <div className="pt-1 space-y-1">
                     {/* Itemised so the gap between the allotment price and the billed total is
                         explicit rather than something ops has to work out. */}
                     <div className="flex justify-between text-xs text-text-secondary">
@@ -311,8 +385,11 @@ function BillableTripsTab() {
                   </div>
                 </div>
               )}
+              </div>
+              </div>
             </Card>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -333,45 +410,6 @@ function BillableTripsTab() {
                 {voidMutation.isPending ? "Voiding…" : "Confirm Void"}
               </Button>
               <Button variant="secondary" className="flex-1" onClick={() => { setVoidModal(null); setVoidReason(""); }}>
-                Cancel
-              </Button>
-            </div>
-          </div>
-        </Modal>
-      )}
-
-      {adjustModal && (
-        <Modal open title="Add Adjustment" onClose={() => { setAdjustModal(null); setAdjustAmount(""); setAdjustReason(""); }}>
-          <div className="space-y-4">
-            <p className="text-sm text-text-secondary">Enter a signed amount (negative for credit, positive for debit) and reason.</p>
-            <FormField label={`Amount (${adjustModal.currency})`}>
-              <Input
-                type="number"
-                value={adjustAmount}
-                onChange={(e) => setAdjustAmount(e.target.value)}
-                placeholder="-50.00"
-              />
-            </FormField>
-            <FormField label="Reason">
-              <Input value={adjustReason} onChange={(e) => setAdjustReason(e.target.value)} placeholder="e.g. Toll correction" />
-            </FormField>
-            <div className="flex gap-2">
-              <Button
-                variant="primary"
-                className="flex-1"
-                disabled={!adjustAmount || !adjustReason.trim() || adjustMutation.isPending}
-                onClick={() =>
-                  adjustMutation.mutate({
-                    id: adjustModal.id,
-                    amount_minor: toMinor(adjustAmount, adjustModal.currency),
-                    currency: adjustModal.currency,
-                    reason: adjustReason.trim(),
-                  })
-                }
-              >
-                {adjustMutation.isPending ? "Applying…" : "Apply Adjustment"}
-              </Button>
-              <Button variant="secondary" className="flex-1" onClick={() => { setAdjustModal(null); setAdjustAmount(""); setAdjustReason(""); }}>
                 Cancel
               </Button>
             </div>
@@ -453,23 +491,21 @@ function StatementsTab() {
         </Card>
       ) : (
         statements.map((stmt) => (
-          <Card key={stmt.id} padding="md">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-text-primary">
+          <Card key={stmt.id} padding="md" className="hover:shadow-sm transition-shadow">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-ops-card2 text-text-primary text-sm font-medium">
+                  <Calendar className="w-3.5 h-3.5" />
                   {stmt.period_year}/{String(stmt.period_month).padStart(2, "0")}
-                  {stmt.status && (
-                    <Badge
-                      variant={stmt.status === "FINAL" ? "green" : "amber"}
-                      className="ml-2"
-                    >
-                      {stmt.status}
-                    </Badge>
-                  )}
-                </p>
-                <p className="text-xs text-text-secondary mt-0.5">
-                  {stmt.total_minor != null && stmt.currency && formatMoney(stmt.total_minor, stmt.currency)}
-                </p>
+                </span>
+                {stmt.status && (
+                  <Badge variant={stmt.status === "FINAL" ? "green" : "amber"}>{stmt.status}</Badge>
+                )}
+                {stmt.total_minor != null && stmt.currency && (
+                  <span className="text-sm font-semibold text-text-primary">
+                    {formatMoney(stmt.total_minor, stmt.currency)}
+                  </span>
+                )}
               </div>
               <Button
                 size="sm"
@@ -477,7 +513,7 @@ function StatementsTab() {
                 onClick={() => downloadMutation.mutate(stmt.id)}
                 disabled={downloadMutation.isPending}
               >
-                <ExternalLink className="w-3 h-3 mr-1" /> Download
+                <ExternalLink className="w-3.5 h-3.5" /> Download
               </Button>
             </div>
           </Card>
@@ -577,29 +613,29 @@ function PayoutsTab() {
         </Card>
       ) : (
         payouts.map((payout) => (
-          <Card key={payout.id} padding="md">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-text-primary">
+          <Card key={payout.id} padding="md" className="hover:shadow-sm transition-shadow">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3 flex-wrap">
+                <span className="text-sm font-semibold text-text-primary whitespace-nowrap">
                   {payout.net_minor != null && payout.currency
                     ? formatMoney(payout.net_minor, payout.currency)
                     : payout.id}
-                </p>
-                <p className="text-xs text-text-secondary mt-0.5">
-                  {payout.status && (
-                    <Badge
-                      variant={payout.status === "PAID" ? "green" : payout.status === "APPROVED" ? "blue" : "amber"}
-                      className="mr-2"
-                    >
-                      {payout.status}
-                    </Badge>
-                  )}
-                  {payout.paid_reference && <span>{payout.paid_reference}</span>}
-                  {payout.paid_at && <span className="ml-2">Paid {new Date(payout.paid_at).toLocaleDateString()}</span>}
-                  <span className="ml-2">{payout.period_year}/{String(payout.period_month).padStart(2, "0")}</span>
-                </p>
+                </span>
+                {payout.status && (
+                  <Badge variant={payout.status === "PAID" ? "green" : payout.status === "APPROVED" ? "blue" : "amber"}>
+                    {payout.status}
+                  </Badge>
+                )}
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-ops-card2 text-text-secondary text-xs">
+                  <Calendar className="w-3 h-3" />
+                  {payout.period_year}/{String(payout.period_month).padStart(2, "0")}
+                </span>
+                {payout.paid_reference && <span className="text-xs text-text-tertiary font-mono">{payout.paid_reference}</span>}
+                {payout.paid_at && (
+                  <span className="text-xs text-text-tertiary">Paid {new Date(payout.paid_at).toLocaleDateString()}</span>
+                )}
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 shrink-0">
                 {payout.status === "PENDING" && (
                   <Button
                     size="sm"
@@ -607,7 +643,7 @@ function PayoutsTab() {
                     onClick={() => approveMutation.mutate(payout.id)}
                     disabled={approveMutation.isPending}
                   >
-                    <CheckCircle className="w-3 h-3 mr-1" /> Approve
+                    <CheckCircle className="w-3.5 h-3.5" /> Approve
                   </Button>
                 )}
                 {payout.status === "APPROVED" && (
@@ -617,7 +653,7 @@ function PayoutsTab() {
                     onClick={() => markPaidMutation.mutate(payout.id)}
                     disabled={markPaidMutation.isPending}
                   >
-                    <DollarSign className="w-3 h-3 mr-1" /> Mark Paid
+                    <DollarSign className="w-3.5 h-3.5" /> Mark Paid
                   </Button>
                 )}
               </div>

@@ -4,10 +4,12 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient, keys, formatMoney, isApiError, csrfFetch } from "@/lib/shared";
 import type { components } from "@/lib/shared/api/schema.d";
+import { fetchAllPages } from "@/hooks/useCursorPagination";
 import { useToastStore } from "@/stores/toastStore";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { AddressAutocomplete } from "@/components/ui/AddressAutocomplete";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { FormField } from "@/components/ui/FormField";
 import { Badge } from "@/components/ui/Badge";
@@ -95,6 +97,13 @@ export const ManualTripCreation: React.FC<{ onDone?: () => void }> = ({ onDone }
   ]);
   const [slots, setSlots] = useState<SlotEntry[]>([{ vehicle_type_id: "", slot_ref: "slot-1", pax: [] }]);
   const [bookedTripId, setBookedTripId] = useState<string | null>(null);
+  // Total passenger count, entered up front — drives the vehicle-type suggestion below, and
+  // seeds that many blank passenger rows on the slot it's applied to.
+  const [totalPax, setTotalPax] = useState(1);
+  // Mirrors totalPax as free text so the box can go momentarily blank while retyping — a
+  // controlled input bound straight to the number can't represent "empty" without snapping
+  // back to the last digit on every keystroke.
+  const [paxText, setPaxText] = useState("1");
 
   const { data: customersData } = useQuery({
     queryKey: keys.config.customers.list(),
@@ -117,24 +126,32 @@ export const ManualTripCreation: React.FC<{ onDone?: () => void }> = ({ onDone }
   const { data: vehicleTypesData } = useQuery({
     queryKey: keys.config.vehicleTypes.list(),
     queryFn: async () => {
-      const { data: res, error: err } = await apiClient.GET("/v1/config/vehicle-types", {});
-      if (err) throw err;
-      return res;
+      // Single-page GET caps at the backend's default page_size=25 — the system now has
+      // more vehicle types than that, so this silently dropped types past the cutoff
+      // (alphabetically, e.g. "Sedan 4c"/"Sedan 5c") from this dropdown entirely.
+      return { results: await fetchAllPages<VehicleType>("/api/v1/config/vehicle-types/") };
     },
   });
 
   // Rate cards are the (vendor × vehicle type) versioned price list — customer-independent.
   // The vehicle type dropdown must only offer types that have an active card for the chosen
   // vendor — otherwise Create fails at quote time with "No rate card for this vehicle type".
+  //
+  // Scoped server-side to the selected vendor (not fetched unfiltered): the system holds one
+  // rate card per vendor × vehicle type × version, which multiplies out to thousands of rows
+  // tenant-wide. An unfiltered single page — even at max_page_size — only ever returns the
+  // most-recently-created slice across ALL vendors, so most vendors' own cards fell outside
+  // it entirely (observed: a vendor with 65 cards showing only the 4 that happened to be
+  // recent). Filtering by vendor keeps each fetch to one vendor's own set, and fetchAllPages
+  // walks every page of that in case it ever exceeds one page.
   const { data: rateCardsData } = useQuery({
-    queryKey: keys.config.rateCards.list(),
-    queryFn: async () => {
-      const { data: res, error: err } = await apiClient.GET("/v1/config/pricing/rate-cards", {
-        params: { query: { page_size: 100 } },
-      });
-      if (err) throw err;
-      return res;
-    },
+    queryKey: keys.config.rateCards.list({ vendor: vendorId }),
+    queryFn: async () => ({
+      results: await fetchAllPages<RateCard>(
+        `/api/v1/config/pricing/rate-cards/?vendor=${encodeURIComponent(vendorId)}`
+      ),
+    }),
+    enabled: !!vendorId,
   });
 
   const customers = (customersData?.results ?? []) as Customer[];
@@ -166,6 +183,71 @@ export const ManualTripCreation: React.FC<{ onDone?: () => void }> = ({ onDone }
     ? vehicleTypes.filter((v) => eligibleVehicleTypeIds.has(v.id))
     : vehicleTypes;
 
+  // Rate-card-covered types (for the selected vendor) that seat at least totalPax, smallest
+  // first — "just enough capacity" rather than always pointing at the biggest car.
+  const suggestedVehicleTypes = useMemo(() => {
+    return visibleVehicleTypes
+      .filter((v) => typeof v.capacity === "number" && v.capacity >= totalPax)
+      .sort((a, b) => (a.capacity ?? 0) - (b.capacity ?? 0));
+  }, [visibleVehicleTypes, totalPax]);
+
+  // Largest capacity the vendor has any rate card for at all — only meaningful when nothing
+  // above fits, to tell the difference between "no vehicle is big enough" and "no vehicle
+  // types loaded yet".
+  const maxAvailableCapacity = useMemo(() => {
+    return visibleVehicleTypes.reduce(
+      (max, v) => (typeof v.capacity === "number" && v.capacity > max ? v.capacity : max),
+      0
+    );
+  }, [visibleVehicleTypes]);
+
+  // Keep the free-text box in sync whenever totalPax changes via the +/- buttons or a
+  // suggestion click (see applySuggestion), without fighting the user's own typing (below).
+  useEffect(() => {
+    setPaxText(String(totalPax));
+  }, [totalPax]);
+
+  const setPax = (n: number) => setTotalPax(Math.max(1, n));
+
+  /** Free-typed passenger count: digits only, and briefly allowed to sit empty while the user
+   * retypes — totalPax (and therefore the suggestions) updates the instant it's a valid
+   * positive integer, without forcing the box to snap back mid-edit.
+   */
+  const onPaxTextChange = (raw: string) => {
+    if (raw !== "" && !/^\d+$/.test(raw)) return;
+    setPaxText(raw);
+    if (raw === "") return;
+    const n = parseInt(raw, 10);
+    if (n >= 1) setTotalPax(n);
+  };
+
+  const onPaxTextBlur = () => {
+    if (paxText === "" || parseInt(paxText, 10) < 1) setPaxText(String(totalPax));
+  };
+
+  const resizePax = (pax: PaxEntry[], count: number): PaxEntry[] => {
+    if (pax.length === count) return pax;
+    if (pax.length > count) return pax.slice(0, count);
+    return [...pax, ...Array.from({ length: count - pax.length }, () => ({ name: "", phone: "" }))];
+  };
+
+  // Fill the first empty slot (or slot 0, if every slot already has a type) with the chosen
+  // suggestion, and resize its passenger rows to match totalPax (capped at the car's seats) —
+  // extending with blank rows or trimming trailing ones, so clicking a suggestion always
+  // reflects the current passenger count, not just the first time a type is picked.
+  const applySuggestion = (vt: VehicleType) => {
+    setSlots((prev) => {
+      const emptyIdx = prev.findIndex((s) => !s.vehicle_type_id);
+      const targetIdx = emptyIdx === -1 ? 0 : emptyIdx;
+      return prev.map((s, i) => {
+        if (i !== targetIdx) return s;
+        const seats = typeof vt.capacity === "number" ? vt.capacity : totalPax;
+        const paxCount = Math.min(totalPax, seats);
+        return { ...s, vehicle_type_id: vt.id, pax: resizePax(s.pax, paxCount) };
+      });
+    });
+  };
+
   // Changing customer/vendor can remove a previously-chosen car type from the rate-card set;
   // clear those slots rather than let Create fail on a stale selection.
   useEffect(() => {
@@ -193,12 +275,27 @@ export const ManualTripCreation: React.FC<{ onDone?: () => void }> = ({ onDone }
       const when = pickupAt ? new Date(pickupAt).toISOString() : new Date().toISOString();
       const chosen: { slot: SlotEntry; offer: QuoteOffer }[] = [];
 
+      // First/last stop, same PICKUP/DROP convention the stops list itself uses. Sent so the
+      // backend can estimate a real distance (from these coordinates, or by geocoding the
+      // address as a fallback) when distance_km isn't supplied directly — otherwise a PER_KM
+      // rate card silently prices the quote at 0.
+      const firstStop = stops[0];
+      const lastStop = stops[stops.length - 1];
+      const asPlace = (s: StopEntry | undefined) =>
+        s ? { address: s.address, lat: s.lat || undefined, lng: s.lng || undefined } : undefined;
+
       for (const slot of slots) {
         if (!slot.vehicle_type_id) continue;
         const resp = await csrfFetch("/api/v1/pricing/offers/", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ customer: customerId, vehicle_type: slot.vehicle_type_id, when }),
+          body: JSON.stringify({
+            customer: customerId,
+            vehicle_type: slot.vehicle_type_id,
+            when,
+            pickup: asPlace(firstStop),
+            drop: asPlace(lastStop),
+          }),
         });
         const envelope = await resp.json() as { result?: QuoteOffer[]; error?: { message?: string } };
         if (!resp.ok) throw new Error(envelope?.error?.message ?? `Pricing failed (${resp.status})`);
@@ -259,6 +356,16 @@ export const ManualTripCreation: React.FC<{ onDone?: () => void }> = ({ onDone }
 
   const updateStop = (idx: number, field: keyof StopEntry, value: string | number) => {
     setStops((prev) => prev.map((s, i) => i === idx ? { ...s, [field]: value } : s));
+  };
+
+  // Free-typing an address invalidates any previously-picked coordinates — they no longer
+  // necessarily match what's in the box. Picking a suggestion sets address + lat + lng together
+  // (AddressAutocomplete.onSelect), so the coordinates always come from a real matched place.
+  const updateStopAddressText = (idx: number, address: string) => {
+    setStops((prev) => prev.map((s, i) => i === idx ? { ...s, address, lat: 0, lng: 0 } : s));
+  };
+  const selectStopAddress = (idx: number, result: { address: string; lat: number; lng: number }) => {
+    setStops((prev) => prev.map((s, i) => i === idx ? { ...s, ...result } : s));
   };
 
   const addStop = () => {
@@ -372,10 +479,12 @@ export const ManualTripCreation: React.FC<{ onDone?: () => void }> = ({ onDone }
                 </button>
               )}
             </div>
-            <Input
+            <AddressAutocomplete
               placeholder="Address"
               value={stop.address}
-              onChange={(e) => updateStop(idx, "address", e.target.value)}
+              hasCoordinates={!!stop.lat && !!stop.lng}
+              onTextChange={(text) => updateStopAddressText(idx, text)}
+              onSelect={(result) => selectStopAddress(idx, result)}
             />
             <div className="grid grid-cols-2 gap-2">
               <div>
@@ -412,6 +521,64 @@ export const ManualTripCreation: React.FC<{ onDone?: () => void }> = ({ onDone }
             <Plus className="w-3 h-3 mr-1" /> Vehicle
           </Button>
         </div>
+
+        <FormField label="Passengers">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setPax(totalPax - 1)}
+              disabled={totalPax <= 1}
+              aria-label="Decrease passenger count"
+              className="w-8 h-8 flex items-center justify-center rounded-lg border border-border bg-white text-text-primary disabled:text-text-tertiary disabled:cursor-not-allowed hover:bg-ops-bg"
+            >
+              <Minus className="w-3.5 h-3.5" />
+            </button>
+            <input
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              value={paxText}
+              onChange={(e) => onPaxTextChange(e.target.value)}
+              onBlur={onPaxTextBlur}
+              aria-label="Passenger count"
+              className="w-14 h-8 px-1 text-center text-sm font-medium bg-white border border-border rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-transparent"
+            />
+            <button
+              type="button"
+              onClick={() => setPax(totalPax + 1)}
+              aria-label="Increase passenger count"
+              className="w-8 h-8 flex items-center justify-center rounded-lg border border-border bg-white text-text-primary hover:bg-ops-bg"
+            >
+              <Plus className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </FormField>
+
+        {vendorId && (
+          <p className="text-xs text-text-secondary">
+            {suggestedVehicleTypes.length > 0 ? (
+              <span className="flex flex-wrap items-center gap-1.5">
+                Suggested for {totalPax} passenger{totalPax !== 1 ? "s" : ""}:
+                {suggestedVehicleTypes.slice(0, 3).map((v) => (
+                  <button
+                    key={v.id}
+                    type="button"
+                    onClick={() => applySuggestion(v)}
+                    className="px-2 py-0.5 rounded-full border border-brand-blue text-brand-blue hover:bg-brand-blue hover:text-white transition-colors"
+                  >
+                    {v.name} ({v.capacity} seats)
+                  </button>
+                ))}
+              </span>
+            ) : (
+              <span className="text-warning">
+                No rate-card-covered vehicle type for this vendor seats {totalPax}+ passengers
+                {maxAvailableCapacity > 0 && ` (largest available: ${maxAvailableCapacity} seats)`}.
+                Add more vehicles to split the group, or choose a different vendor.
+              </span>
+            )}
+          </p>
+        )}
 
         {customerId && vendorId && (
           <p className="text-xs text-text-secondary">

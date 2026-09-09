@@ -38,6 +38,12 @@ export const keys = {
       detail: (id: string) =>
         ["config", "vehicle-types", "detail", id] as const,
     },
+    vehicleNames: {
+      list: (filters?: FiltersShape) =>
+        ["config", "vehicle-names", "list", filters ?? {}] as const,
+      detail: (id: string) =>
+        ["config", "vehicle-names", "detail", id] as const,
+    },
     rateCards: {
       list: (filters?: FiltersShape) =>
         ["config", "pricing", "rate-cards", "list", filters ?? {}] as const,

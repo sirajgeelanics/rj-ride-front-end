@@ -136,12 +136,9 @@ export const TripsListTab: React.FC = () => {
   if (selectedTripId) {
     return (
       <div>
-        <button
-          onClick={() => setSelectedTripId(null)}
-          className="text-sm text-brand-blue hover:text-brand-blue/80 mb-4 flex items-center gap-1"
-        >
+        <Button size="sm" variant="secondary" className="mb-4" onClick={() => setSelectedTripId(null)}>
           <ChevronLeft className="w-4 h-4" /> Back to list
-        </button>
+        </Button>
         <TripDetailView tripId={selectedTripId} />
       </div>
     );
@@ -155,7 +152,7 @@ export const TripsListTab: React.FC = () => {
           <select
             value={statusFilter}
             onChange={(e) => { setStatusFilter(e.target.value); resetPagination(); }}
-            className="px-3 py-2 bg-white border border-border rounded-lg text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-blue"
+            className="px-3 py-2 bg-white border border-border rounded-lg text-sm text-text-primary cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand-blue"
           >
             {STATUS_FILTERS.map((s) => (
               <option key={s} value={s}>{s || "All statuses"}</option>
@@ -171,7 +168,7 @@ export const TripsListTab: React.FC = () => {
           <DateTimePicker mode="date" value={dateTo} onChange={(val) => { setDateTo(val); resetPagination(); }} />
         </div>
         {!isLoading && trips.length > 0 && (
-          <span className="ml-auto self-center text-xs text-text-tertiary tabular-nums">
+          <span className="ml-auto self-center px-2.5 py-1 rounded-full bg-ops-card2 text-xs text-text-secondary tabular-nums">
             {trips.length} trip{trips.length !== 1 ? "s" : ""}{hasNext ? "+" : ""} on this page
           </span>
         )}
@@ -200,7 +197,7 @@ export const TripsListTab: React.FC = () => {
                 tabIndex={0}
                 onClick={() => setSelectedTripId(trip.id)}
                 onKeyDown={(e) => e.key === "Enter" && setSelectedTripId(trip.id)}
-                className="group flex items-center gap-4 rounded-lg border border-border bg-white px-4 py-3 cursor-pointer transition-all hover:border-brand-blue/40 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-brand-blue/30"
+                className="group flex items-center gap-4 rounded-lg border border-border bg-white px-4 py-3.5 cursor-pointer transition-all hover:border-brand-blue/40 hover:shadow-md hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-brand-blue/30"
               >
                 <StatusBadge status={trip.status as TripStatus} />
 
@@ -211,26 +208,26 @@ export const TripsListTab: React.FC = () => {
                       <span className="text-sm text-text-secondary truncate">· {trip.customer_name}</span>
                     )}
                     {(trip.created_via === "API_PAX" || trip.created_via === "API_VEHICLE_COUNT") && (
-                      <span className="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-brand-blue/10 text-brand-blue">
+                      <span className="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-brand-blue/10 text-brand-blue">
                         RITMO
                       </span>
                     )}
                   </div>
-                  <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-0.5 text-xs text-text-secondary">
-                    <span className="inline-flex items-center gap-1.5">
-                      <Clock className="w-3.5 h-3.5 text-text-tertiary shrink-0" />
+                  <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-ops-card2 text-text-secondary text-xs">
+                      <Clock className="w-3 h-3 shrink-0" />
                       {trip.pickup_at ? new Date(trip.pickup_at).toLocaleString() : "No pickup time"}
                     </span>
                     {trip.vehicles.length > 0 && (
-                      <span className="inline-flex items-center gap-1.5">
-                        <Car className="w-3.5 h-3.5 text-text-tertiary shrink-0" />
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent-gold/15 text-text-primary text-xs">
+                        <Car className="w-3 h-3 text-accent-gold shrink-0" />
                         {trip.vehicles.length} vehicle{trip.vehicles.length !== 1 ? "s" : ""}
                       </span>
                     )}
                     {vendors.length > 0 && (
-                      <span className="inline-flex items-center gap-1.5 min-w-0">
-                        <Building2 className="w-3.5 h-3.5 text-text-tertiary shrink-0" />
-                        <span className="truncate text-text-primary">{vendors.join(", ")}</span>
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-brand-blue/10 text-brand-blue text-xs font-medium min-w-0">
+                        <Building2 className="w-3 h-3 shrink-0" />
+                        <span className="truncate">{vendors.join(", ")}</span>
                       </span>
                     )}
                   </div>

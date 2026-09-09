@@ -12,9 +12,11 @@ import { Modal } from "@/components/ui/Modal";
 import { Input } from "@/components/ui/Input";
 import { FormField } from "@/components/ui/FormField";
 import { Select } from "@/components/ui/Select";
+import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { Badge } from "@/components/ui/Badge";
 import { PII } from "@/components/ui/PII";
 import { HealthStrip } from "@/components/configuration/HealthStrip";
+import { DriverLoginPanel } from "@/components/configuration/DriverLoginPanel";
 import { MultiSelectFilter } from "@/components/ui/MultiSelectFilter";
 import { useToastStore } from "@/stores/toastStore";
 
@@ -29,6 +31,11 @@ interface DriverFormState {
   licence_number: string;
   status: string;
   is_active: boolean;
+  // Create-only: optionally provision the driver's mobile-app login in the same step (mirrors
+  // DriverLoginPanel's own create form). Both blank on edit — logins on an existing driver are
+  // managed via DriverLoginPanel instead.
+  email: string;
+  password: string;
 }
 
 const STATUS_OPTIONS = [
@@ -152,7 +159,7 @@ export const DriversTab: React.FC<DriversTabProps> = ({ searchQuery = "" }) => {
   // Deactivation asks for confirmation first (it removes the driver from the roster).
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; label: string } | null>(null);
 
-  const emptyForm: DriverFormState = { vendor: "", name: "", phone: "", licence_number: "", status: "AVAILABLE", is_active: true };
+  const emptyForm: DriverFormState = { vendor: "", name: "", phone: "", licence_number: "", status: "AVAILABLE", is_active: true, email: "", password: "" };
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState<DriverFormState>(emptyForm);
@@ -174,6 +181,8 @@ export const DriversTab: React.FC<DriversTabProps> = ({ searchQuery = "" }) => {
       licence_number: "",
       status: driver.status ?? "AVAILABLE",
       is_active: driver.is_active,
+      email: "",
+      password: "",
     });
     setDrawerOpen(true);
   };
@@ -200,6 +209,12 @@ export const DriversTab: React.FC<DriversTabProps> = ({ searchQuery = "" }) => {
       addToast("Phone and licence number are required", "error");
       return;
     }
+    const loginEmail = formData.email.trim();
+    const loginPassword = formData.password.trim();
+    if (loginEmail && loginPassword.length < 12) {
+      addToast("A driver-login password is required (min 12 characters) once an email is set", "error");
+      return;
+    }
     createMutation.mutate({
       vendor: formData.vendor,
       name: formData.name.trim(),
@@ -207,6 +222,9 @@ export const DriversTab: React.FC<DriversTabProps> = ({ searchQuery = "" }) => {
       licence_number: formData.licence_number.trim(),
       status: formData.status,
       is_active: formData.is_active,
+      // Optional: provisions a mobile-app login in the same step, with the password the ops
+      // user chose here — never auto-generated. Omitted entirely when blank (no login created).
+      ...(loginEmail ? { email: loginEmail, password: loginPassword } : {}),
     });
   };
 
@@ -321,10 +339,11 @@ export const DriversTab: React.FC<DriversTabProps> = ({ searchQuery = "" }) => {
       >
         <div className="space-y-4">
           <FormField label="Vendor" required>
-            <Select
-              options={vendorOptions}
+            <SearchableSelect
+              options={vendorOptions.filter((o) => o.value)}
               value={formData.vendor}
-              onChange={(e) => setFormData({ ...formData, vendor: e.target.value })}
+              onChange={(val) => setFormData({ ...formData, vendor: val })}
+              placeholder="Search vendor…"
             />
           </FormField>
 
@@ -359,6 +378,33 @@ export const DriversTab: React.FC<DriversTabProps> = ({ searchQuery = "" }) => {
               onChange={(e) => setFormData({ ...formData, status: e.target.value })}
             />
           </FormField>
+
+          {!editingId && (
+            <>
+              <FormField label="Driver app login email">
+                <Input
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  placeholder="Optional — leave blank to set up a login later"
+                />
+              </FormField>
+
+              {formData.email.trim() && (
+                <FormField label="Driver app login password" required>
+                  <Input
+                    type="password"
+                    value={formData.password}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    placeholder="Min 12 characters — this is the final password"
+                    autoComplete="new-password"
+                  />
+                </FormField>
+              )}
+            </>
+          )}
+
+          {editingId && <DriverLoginPanel driverId={editingId} driverName={formData.name} />}
 
           <div className="flex items-center gap-2">
             <input

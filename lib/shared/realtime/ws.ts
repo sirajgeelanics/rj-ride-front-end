@@ -29,15 +29,12 @@ export type SosEvent = {
   payload: Record<string, unknown>;
 };
 
-export type TrackingEvent = {
-  type: "tracking.position";
-  deviceId: string;
-  lat: number;
-  lng: number;
-  speed?: number;
-  heading?: number;
-  timestamp: string;
-};
+// apps.tracking.tasks broadcasts {trip_vehicle_id, vehicle_id, vendor_id, lat, lng, speed_kmh,
+// heading, status, at} — same shape as every other event, read via `.payload`. This used to
+// declare deviceId/lat/lng/speed/heading/timestamp as top-level fields, which normalizeFrame
+// never actually populates (it only lifts a few ids, not this event's own fields) — every
+// consumer reading those was silently getting undefined.
+export type TrackingEvent = { type: "tracking.position"; payload: Record<string, unknown> };
 
 export type DocumentEvent = {
   type: "document.expiry_warning";

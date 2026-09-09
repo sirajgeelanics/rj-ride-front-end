@@ -12,7 +12,7 @@ import { Modal } from "@/components/ui/Modal";
 import { MultiSelectFilter } from "@/components/ui/MultiSelectFilter";
 import { Input } from "@/components/ui/Input";
 import { FormField } from "@/components/ui/FormField";
-import { Select } from "@/components/ui/Select";
+import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { Badge } from "@/components/ui/Badge";
 import { HealthStrip } from "@/components/configuration/HealthStrip";
 import { useToastStore } from "@/stores/toastStore";
@@ -21,10 +21,15 @@ type ApiVehicle = components["schemas"]["Vehicle"];
 type PatchedVehicle = components["schemas"]["PatchedVehicle"];
 type ApiVendor = components["schemas"]["Vendor"];
 type ApiVehicleType = components["schemas"]["VehicleType"];
+type ApiVehicleName = components["schemas"]["VehicleName"];
 
 interface VehicleWriteInput {
   vendor: string;
   vehicle_type: string;
+  // The specific make/model, drawn from vehicle_type's own VehicleName catalog — optional,
+  // and cleared whenever vehicle_type changes since a name from the old type would no longer
+  // be valid for the new one (the backend enforces this too).
+  vehicle_name?: string;
   plate: string;
   traccar_device_id?: string;
   is_active?: boolean;
@@ -77,13 +82,21 @@ export const VehiclesTab: React.FC<VehiclesTabProps> = ({ searchQuery = "" }) =>
   const { data: vtData } = useQuery({
     queryKey: keys.config.vehicleTypes.list(),
     queryFn: async () => {
-      const { data: res, error: err } = await apiClient.GET("/v1/config/vehicle-types", {});
-      if (err) throw err;
-      return res;
+      // Same reasoning as the vendors fetch above: cursor-paginated at 25/page, and the
+      // catalogue is now well past that — a single-page fetch would drop most types from
+      // this dropdown (silently, since the request itself still succeeds).
+      return { results: await fetchAllPages<ApiVehicleType>("/api/v1/config/vehicle-types/") };
+    },
+  });
+  const { data: vnData } = useQuery({
+    queryKey: keys.config.vehicleNames.list(),
+    queryFn: async () => {
+      return { results: await fetchAllPages<ApiVehicleName>("/api/v1/config/vehicle-names/") };
     },
   });
   const vendors = (vendorsData?.results ?? []) as ApiVendor[];
   const vehicleTypes = (vtData?.results ?? []) as ApiVehicleType[];
+  const vehicleNames = (vnData?.results ?? []) as ApiVehicleName[];
 
   const vendorFilterOptions = vendors.map((v) => ({ value: v.id, label: v.name }));
 
@@ -163,7 +176,7 @@ export const VehiclesTab: React.FC<VehiclesTabProps> = ({ searchQuery = "" }) =>
   // Deactivation asks for confirmation first (it removes the vehicle from the fleet).
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; label: string } | null>(null);
 
-  const emptyForm: VehicleWriteInput = { vendor: "", vehicle_type: "", plate: "", traccar_device_id: "", is_active: true };
+  const emptyForm: VehicleWriteInput = { vendor: "", vehicle_type: "", vehicle_name: "", plate: "", traccar_device_id: "", is_active: true };
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState<VehicleWriteInput>(emptyForm);
@@ -179,6 +192,7 @@ export const VehiclesTab: React.FC<VehiclesTabProps> = ({ searchQuery = "" }) =>
     setFormData({
       vendor: vehicle.vendor,
       vehicle_type: vehicle.vehicle_type,
+      vehicle_name: vehicle.vehicle_name ?? "",
       plate: vehicle.plate,
       traccar_device_id: vehicle.traccar_device_id ?? "",
       is_active: vehicle.is_active,
@@ -194,6 +208,7 @@ export const VehiclesTab: React.FC<VehiclesTabProps> = ({ searchQuery = "" }) =>
     const input: VehicleWriteInput = {
       vendor: formData.vendor,
       vehicle_type: formData.vehicle_type,
+      vehicle_name: formData.vehicle_name || undefined,
       plate: formData.plate.trim(),
       traccar_device_id: formData.traccar_device_id?.trim() || undefined,
       is_active: formData.is_active,
@@ -204,6 +219,14 @@ export const VehiclesTab: React.FC<VehiclesTabProps> = ({ searchQuery = "" }) =>
       createMutation.mutate(input);
     }
   };
+
+  // Only names belonging to the currently-selected vehicle_type — the backend rejects any
+  // other combination (Vehicle.clean()), so the dropdown never offers an invalid pairing.
+  const vehicleNamesForType = vehicleNames.filter((n) => n.vehicle_type === formData.vehicle_type);
+  const vehicleNameOptions = [
+    { value: "", label: formData.vehicle_type ? "None" : "Select a vehicle type first…" },
+    ...vehicleNamesForType.map((n) => ({ value: n.id, label: n.name })),
+  ];
 
   const vendorOptions = [
     { value: "", label: "Select vendor…" },
@@ -229,6 +252,12 @@ export const VehiclesTab: React.FC<VehiclesTabProps> = ({ searchQuery = "" }) =>
       },
     },
     {
+      key: "vehicle_name_display",
+      header: "Model",
+      sortable: true,
+      render: (val): React.ReactNode => (val as string) || t("dash", language),
+    },
+    {
       key: "vendor_name",
       header: "Vendor",
       sortable: true,
@@ -237,9 +266,14 @@ export const VehiclesTab: React.FC<VehiclesTabProps> = ({ searchQuery = "" }) =>
     {
       key: "is_active",
       header: t("status", language),
-      render: (val): React.ReactNode => (
-        <Badge variant={val ? "green" : "red"}>{val ? t("active", language) : t("inactive", language)}</Badge>
-      ),
+      // `status` isn't in the generated schema yet — hand-typed to match
+      // apps.fleet.api.serializers.VehicleSerializer's operational status field, distinct
+      // from is_active (whether the vehicle is in the fleet roster at all).
+      render: (val, row): React.ReactNode => {
+        const opStatus = (row as unknown as { status?: string }).status;
+        if (opStatus === "breakdown") return <Badge variant="red">Breakdown</Badge>;
+        return <Badge variant={val ? "green" : "red"}>{val ? t("active", language) : t("inactive", language)}</Badge>;
+      },
     },
     {
       key: "actions",
@@ -312,18 +346,35 @@ export const VehiclesTab: React.FC<VehiclesTabProps> = ({ searchQuery = "" }) =>
       >
         <div className="space-y-4">
           <FormField label="Vendor" required>
-            <Select
-              options={vendorOptions}
+            <SearchableSelect
+              options={vendorOptions.filter((o) => o.value)}
               value={formData.vendor}
-              onChange={(e) => setFormData({ ...formData, vendor: e.target.value })}
+              onChange={(val) => setFormData({ ...formData, vendor: val })}
+              placeholder="Search vendor…"
             />
           </FormField>
 
           <FormField label="Vehicle Type" required>
-            <Select
-              options={vehicleTypeOptions}
+            <SearchableSelect
+              options={vehicleTypeOptions.filter((o) => o.value)}
               value={formData.vehicle_type}
-              onChange={(e) => setFormData({ ...formData, vehicle_type: e.target.value })}
+              onChange={(val) =>
+                // A name from the previous type would no longer be valid for the new one
+                // (the backend enforces the pairing), so clear it along with the type.
+                setFormData({ ...formData, vehicle_type: val, vehicle_name: "" })
+              }
+              placeholder="Search vehicle type…"
+            />
+          </FormField>
+
+          <FormField label="Vehicle Name (Model)">
+            <SearchableSelect
+              options={vehicleNameOptions.filter((o) => o.value)}
+              value={formData.vehicle_name ?? ""}
+              onChange={(val) => setFormData({ ...formData, vehicle_name: val })}
+              disabled={!formData.vehicle_type}
+              placeholder={formData.vehicle_type ? "Search model…" : "Select a vehicle type first…"}
+              clearable
             />
           </FormField>
 

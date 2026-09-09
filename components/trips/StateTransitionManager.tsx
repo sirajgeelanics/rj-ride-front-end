@@ -17,13 +17,6 @@ interface StateTransitionManagerProps {
   currentStatus: string;
 }
 
-const VEHICLE_STATUS = [
-  "PENDING", "ASSIGNED", "DRIVER_ACCEPTED", "DRIVER_REJECTED",
-  "EN_ROUTE_PICKUP", "AT_PICKUP", "PAX_PICKED", "IN_TRANSIT",
-  "AT_DROP", "PAX_DROPPED", "COMPLETED",
-  "NO_SHOW", "BREAKDOWN", "ACCIDENT", "VEHICLE_SWAP", "DELAYED", "SOS", "CANCELLED",
-] as const;
-
 const TRANSITION_LABELS: Record<string, string> = {
   ASSIGNED: "Mark Assigned",
   DRIVER_ACCEPTED: "Driver Accepted",
@@ -47,13 +40,28 @@ const OTP_PHASE_MAP: Record<string, "pickup" | "drop"> = {
   PAX_DROPPED: "drop",
 };
 
-const TERMINAL_STATUSES = new Set(["COMPLETED", "CANCELLED", "ACCIDENT"]);
+// Mirrors apps.trips.lifecycle.ALLOWED_TRANSITIONS exactly — showing a target this map doesn't
+// list is worse than showing nothing: it looks like a valid action and just 409s when clicked.
+// VENDOR_OFFERED/SOS are legal backend targets too but have no button here (VENDOR_OFFERED is
+// the RITMO timed-offer cycle, not a manual pick; SOS is the dedicated safety flow, not a
+// generic status dropdown) — TRANSITION_LABELS simply has no entry for either, so the
+// intersection below already excludes them without special-casing.
+const ALLOWED_TRANSITIONS: Record<string, string[]> = {
+  PENDING: ["ASSIGNED", "CANCELLED"],
+  ASSIGNED: ["DRIVER_ACCEPTED", "BREAKDOWN", "CANCELLED"],
+  DRIVER_ACCEPTED: ["EN_ROUTE_PICKUP", "BREAKDOWN", "CANCELLED"],
+  EN_ROUTE_PICKUP: ["AT_PICKUP", "BREAKDOWN", "DELAYED", "CANCELLED"],
+  AT_PICKUP: ["PAX_PICKED", "NO_SHOW", "BREAKDOWN", "DELAYED", "CANCELLED"],
+  PAX_PICKED: ["IN_TRANSIT", "BREAKDOWN"],
+  IN_TRANSIT: ["AT_DROP", "BREAKDOWN"],
+  AT_DROP: ["PAX_DROPPED", "BREAKDOWN"],
+  PAX_DROPPED: ["COMPLETED"],
+  BREAKDOWN: ["EN_ROUTE_PICKUP", "CANCELLED"],
+  DELAYED: ["EN_ROUTE_PICKUP", "AT_PICKUP", "CANCELLED"],
+};
 
 function getAvailableTargets(currentStatus: string): string[] {
-  const allTargets = Object.keys(TRANSITION_LABELS);
-  return allTargets.filter(
-    (t) => t !== currentStatus && !TERMINAL_STATUSES.has(currentStatus)
-  );
+  return ALLOWED_TRANSITIONS[currentStatus] ?? [];
 }
 
 export const StateTransitionManager: React.FC<StateTransitionManagerProps> = ({
@@ -120,11 +128,10 @@ export const StateTransitionManager: React.FC<StateTransitionManagerProps> = ({
     },
   });
 
-  if (TERMINAL_STATUSES.has(currentStatus)) {
+  const availableTargets = getAvailableTargets(currentStatus);
+  if (availableTargets.length === 0) {
     return null;
   }
-
-  const availableTargets = getAvailableTargets(currentStatus);
 
   const handleTransition = (targetStatus: string) => {
     if (OTP_REQUIRED_STATUSES.has(targetStatus)) {
@@ -141,20 +148,40 @@ export const StateTransitionManager: React.FC<StateTransitionManagerProps> = ({
     verifyOtpMutation.mutate({ phase: otpModal.phase, otp: otpValue.trim() });
   };
 
+  const DANGER_TARGETS = new Set(["BREAKDOWN", "NO_SHOW", "CANCELLED"]);
+  // The first listed target is always the normal forward step in the lifecycle (see
+  // ALLOWED_TRANSITIONS — it's listed first for every status); everything after it is an
+  // exception path. Highlighting it lets ops spot the expected next click at a glance instead
+  // of scanning an unranked row of buttons.
+  // Non-null: the length===0 return above guarantees at least one target here.
+  const [primaryTarget, ...restTargets] = availableTargets as [string, ...string[]];
+
   return (
-    <div className="flex flex-wrap gap-1.5 mt-2">
-      {availableTargets.map((target) => (
+    <div className="mt-2">
+      <p className="text-[11px] font-medium text-text-tertiary uppercase tracking-wide mb-1">Update status</p>
+      <div className="flex flex-wrap gap-1.5">
         <Button
-          key={target}
+          key={primaryTarget}
           size="sm"
-          variant={["BREAKDOWN", "NO_SHOW", "ACCIDENT", "CANCELLED"].includes(target) ? "ghost" : "secondary"}
-          className={["BREAKDOWN", "NO_SHOW", "ACCIDENT", "CANCELLED"].includes(target) ? "text-danger border-danger/30 text-xs" : "text-xs"}
-          onClick={() => handleTransition(target)}
+          variant="primary"
+          onClick={() => handleTransition(primaryTarget)}
           disabled={transitionMutation.isPending}
         >
-          {TRANSITION_LABELS[target] ?? target}
+          {TRANSITION_LABELS[primaryTarget] ?? primaryTarget}
         </Button>
-      ))}
+        {restTargets.map((target) => (
+          <Button
+            key={target}
+            size="sm"
+            variant={DANGER_TARGETS.has(target) ? "ghost" : "secondary"}
+            className={DANGER_TARGETS.has(target) ? "text-danger hover:bg-danger/10" : ""}
+            onClick={() => handleTransition(target)}
+            disabled={transitionMutation.isPending}
+          >
+            {TRANSITION_LABELS[target] ?? target}
+          </Button>
+        ))}
+      </div>
 
       {otpModal && (
         <Modal

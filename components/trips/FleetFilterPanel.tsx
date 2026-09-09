@@ -149,7 +149,14 @@ export const FleetFilterPanel: React.FC = () => {
 
   return (
     <div className="space-y-3">
-      {open && (
+      {/* CSS-grid expand trick (0fr -> 1fr) so the panel opens/closes smoothly in both
+          directions instead of snapping; overflow-hidden clips it mid-transition. */}
+      <div
+        className={`grid transition-[grid-template-rows] duration-300 ease-in-out ${
+          open ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+        }`}
+      >
+      <div className="overflow-hidden">
         <Card padding="md" className="bg-ops-bg">
           <div className="flex flex-wrap items-end gap-3">
             <div>
@@ -282,7 +289,8 @@ export const FleetFilterPanel: React.FC = () => {
             </div>
           )}
         </Card>
-      )}
+      </div>
+      </div>
     </div>
   );
 };
