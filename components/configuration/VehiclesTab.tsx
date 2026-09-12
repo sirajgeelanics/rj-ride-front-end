@@ -44,18 +44,25 @@ export const VehiclesTab: React.FC<VehiclesTabProps> = ({ searchQuery = "" }) =>
   const addToast = useToastStore((s) => s.addToast);
   const queryClient = useQueryClient();
 
-  // Vendor ids to narrow the fleet to. Empty = no filter (show every vendor's vehicles).
+  // Vendor / vehicle-type ids to narrow the fleet to. Empty = no filter (show everything).
   const [vendorFilter, setVendorFilter] = useState<string[]>([]);
+  const [vehicleTypeFilter, setVehicleTypeFilter] = useState<string[]>([]);
 
   const { data: vehiclesData, isLoading, error } = useQuery({
-    // The filter is part of the key, so each vendor combination is cached separately and
-    // switching back to a previous selection is instant.
-    queryKey: keys.fleet.vehicles.list({ vendor_in: vendorFilter.join(",") }),
+    // The filters are part of the key, so each combination is cached separately and switching
+    // back to a previous selection is instant.
+    queryKey: keys.fleet.vehicles.list({
+      vendor_in: vendorFilter.join(","),
+      vehicle_type_in: vehicleTypeFilter.join(","),
+    }),
     queryFn: async () => {
-      // Filtered server-side via ?vendor_in=<id>,<id> rather than in the browser: the list is
-      // cursor-paginated, so filtering the current page would only ever search the first 25
-      // rows and silently miss the rest.
-      const qs = vendorFilter.length ? `?vendor_in=${vendorFilter.join(",")}` : "";
+      // Filtered server-side via ?vendor_in=<id>,<id>&vehicle_type_in=<id>,<id> rather than in
+      // the browser: the list is cursor-paginated, so filtering the current page would only
+      // ever search the first 25 rows and silently miss the rest.
+      const params = new URLSearchParams();
+      if (vendorFilter.length) params.set("vendor_in", vendorFilter.join(","));
+      if (vehicleTypeFilter.length) params.set("vehicle_type_in", vehicleTypeFilter.join(","));
+      const qs = params.toString() ? `?${params.toString()}` : "";
       // Follow every cursor page so all vehicles load — not just the first 25.
       return { results: await fetchAllPages<ApiVehicle>(`/api/v1/fleet/vehicles/${qs}`) };
     },
@@ -99,6 +106,7 @@ export const VehiclesTab: React.FC<VehiclesTabProps> = ({ searchQuery = "" }) =>
   const vehicleNames = (vnData?.results ?? []) as ApiVehicleName[];
 
   const vendorFilterOptions = vendors.map((v) => ({ value: v.id, label: v.name }));
+  const vehicleTypeFilterOptions = vehicleTypes.map((vt) => ({ value: vt.id, label: vt.name }));
 
   const allVehicles: ApiVehicle[] = (vehiclesData as { results?: ApiVehicle[] } | undefined)?.results ?? (vehiclesData as ApiVehicle[] | undefined) ?? [];
 
@@ -317,16 +325,28 @@ export const VehiclesTab: React.FC<VehiclesTabProps> = ({ searchQuery = "" }) =>
 
       <HealthStrip expiredCount={0} expiringCount={0} />
 
-      {/* Narrow the fleet to one or more vendors. Filtering happens server-side, so it spans
-          the whole fleet rather than just the rows already fetched. */}
-      <div className="w-72">
-        <MultiSelectFilter
-          options={vendorFilterOptions}
-          selected={vendorFilter}
-          onChange={setVendorFilter}
-          placeholder="All vendors"
-          searchPlaceholder="Search vendors…"
-        />
+      {/* Narrow the fleet to one or more vendors and/or vehicle types. Both filter server-side
+          (?vendor_in=/?vehicle_type_in=), so they span the whole fleet, not just the rows
+          already fetched. */}
+      <div className="flex flex-wrap gap-3">
+        <div className="w-72">
+          <MultiSelectFilter
+            options={vendorFilterOptions}
+            selected={vendorFilter}
+            onChange={setVendorFilter}
+            placeholder="All vendors"
+            searchPlaceholder="Search vendors…"
+          />
+        </div>
+        <div className="w-72">
+          <MultiSelectFilter
+            options={vehicleTypeFilterOptions}
+            selected={vehicleTypeFilter}
+            onChange={setVehicleTypeFilter}
+            placeholder="All vehicle types"
+            searchPlaceholder="Search vehicle types…"
+          />
+        </div>
       </div>
 
       <QueryBoundary isLoading={isLoading} error={error} isEmpty={vehicles.length === 0} emptyFallback={<p className="text-sm text-text-secondary py-4">{t("noVehicles", language)}</p>}>

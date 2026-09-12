@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient, csrfFetch, isApiError, uuidv4 } from "@/lib/shared";
 import { useToastStore } from "@/stores/toastStore";
@@ -13,6 +13,8 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import { VehicleAssignmentModal } from "@/components/trips/VehicleAssignmentModal";
 import { RitmoManualAllotModal } from "@/components/trips/RitmoManualAllotModal";
 import { RitmoManualSplitModal } from "@/components/trips/RitmoManualSplitModal";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { useRideEvents } from "@/lib/shared/realtime/ws";
 import { AlertTriangle, BellRing, Building2, Car, CheckCircle, Clock, Inbox, MapPin, RefreshCw, Search, Send, User, Pencil, X } from "lucide-react";
 import type { TripStatus } from "@/lib/types";
 
@@ -31,10 +33,15 @@ interface ActiveOffer {
 
 interface RitmoVehicle {
   id: string;
-  vehicle_type_name: string;
+  // Both null when the booked type name matched nothing in this tenant's fleet — see
+  // requested_vehicle_type_name below for what was actually asked for in that case.
+  vehicle_type_name: string | null;
   // The REQUESTED type's own seat count — gates whether "Split across vehicles" is even offered
   // (backend only allows splitting types with 5+ seats; see manual_split_allocate_ritmo_vehicle).
-  vehicle_type_capacity: number;
+  vehicle_type_capacity: number | null;
+  // What RITMO actually asked for when vehicle_type_name is null — e.g. "Sedan-XL" for a type
+  // this tenant's fleet has no VehicleType named. Null once a real match exists.
+  requested_vehicle_type_name: string | null;
   status: string;
   vendor_id: string | null;
   vendor_name: string | null;
@@ -47,7 +54,8 @@ interface RitmoVehicle {
   pax_count: number;
   pax: { name: string; phone: string }[];
   allottable: boolean;
-  // Why a PENDING slot is not yet auto-allotted: "no_city_vendor" | "car_type_unavailable" | "".
+  // Why a PENDING slot is not yet auto-allotted:
+  // "type_not_in_fleet" | "no_city_vendor" | "car_type_unavailable" | "".
   alloc_reason: string;
   active_offer: ActiveOffer | null;
   // Set only on a row born from splitting an unfulfillable single-vehicle request across
@@ -110,13 +118,18 @@ const ACCEPTED_VEHICLE_STATUSES = new Set([
   "COMPLETED",
 ]);
 
-// A vehicle nobody can act on any more — either a vendor already took it (see above) or the
-// slot itself ended without one (cancelled / no-show). Cancel has no business reappearing for
-// either, and the row shouldn't claim a vendor is "Assigned" once it's actually cancelled.
-const SETTLED_VEHICLE_STATUSES = new Set([
-  ...ACCEPTED_VEHICLE_STATUSES,
-  "CANCELLED",
+// Mirrors apps.trips.lifecycle.ALLOWED_TRANSITIONS: CANCELLED is unreachable from any of
+// these — the passenger's already been picked up (PAX_PICKED onward) or the slot already
+// ended one way or another. Every other status, including ASSIGNED/DRIVER_ACCEPTED, can still
+// cancel server-side, so Cancel stays offered through accept/reassign/split, not just PENDING.
+const NOT_CANCELLABLE_VEHICLE_STATUSES = new Set([
+  "PAX_PICKED",
+  "IN_TRANSIT",
+  "AT_DROP",
+  "PAX_DROPPED",
+  "COMPLETED",
   "NO_SHOW",
+  "CANCELLED",
 ]);
 
 // The backend's own apps.trips.services.reassign_vehicle allowed_for_reassign set — a vehicle
@@ -167,6 +180,19 @@ function countdown(iso: string, now: number): string {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
+// dd/mm/yyyy, HH:mm — explicit "en-GB" rather than the browser's own locale (which reads
+// mm/dd/yyyy for a US-locale browser regardless of where the viewer actually is), so every
+// timestamp on this page reads the same way for every ops viewer.
+function formatDateTime(iso: string): string {
+  return new Date(iso).toLocaleString("en-GB", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 export default function RitmoPage() {
   const addToast = useToastStore((s) => s.addToast);
   const qc = useQueryClient();
@@ -200,6 +226,63 @@ export default function RitmoPage() {
   const trips = useMemo(() => data?.results ?? [], [data]);
   const page = useCursorPagination(data?.next);
   useEffect(() => setCursor(page.cursor), [page.cursor]);
+
+  // Live updates: a new RITMO booking or a pickup-time modification shouldn't wait on the 20s
+  // poll. The modification events are RITMO-only by construction (apps.partner_api's own RITMO
+  // surface is the only caller), so those toast directly off the WS payload below. trip.created
+  // fires for every trip in the tenant, not just RITMO ones, so it can't be trusted the same
+  // way — it only drives a refetch here; the effect below toasts once that refetch actually
+  // surfaces a new row in this already RITMO-filtered list (apps.trips.selectors.
+  // ritmo_trips_for_actor), which can never misattribute a manual, non-RITMO booking.
+  useRideEvents({
+    invalidationMap: {
+      "trip.created": ["ritmo", "requests"],
+      "trip.modification_requested": ["ritmo", "requests"],
+      "trip.modification_applied": ["ritmo", "requests"],
+      "trip.modification_rejected": ["ritmo", "requests"],
+      "trip.modification_cancelled": ["ritmo", "requests"],
+    },
+    handler: (event) => {
+      const payload = event.payload as { reference?: string };
+      if (event.type === "trip.modification_requested") {
+        addToast(
+          `${payload.reference ?? "A trip"} — RITMO requested a pickup-time change.`,
+          "info",
+        );
+      } else if (event.type === "trip.modification_cancelled") {
+        addToast(
+          `${payload.reference ?? "A trip"} — RITMO withdrew its pickup-time change request.`,
+          "info",
+        );
+      }
+    },
+  });
+
+  // Newest-first, page 1 only: the ref remembers which trip ids were on the first page after
+  // the last render, seeded silently on first load (so the whole first page doesn't toast).
+  // Any id present now that wasn't in the ref is a request that just landed — whether the list
+  // changed via the WS-triggered refetch above or the ordinary 20s poll. Skipped while browsing
+  // page 2+ (cursor set) so paging never gets misread as a wave of "new" arrivals.
+  const seenTripIdsRef = useRef<Set<string> | null>(null);
+  useEffect(() => {
+    if (cursor !== undefined) return;
+    // Wait for the real first page: `trips` is already `[]` before the query resolves, and
+    // seeding off that empty array here would make every id in the actual first response look
+    // "new" the moment it lands — toasting once per row instead of staying silent on load.
+    if (data === undefined) return;
+    const currentIds = new Set(trips.map((t) => t.id));
+    const seen = seenTripIdsRef.current;
+    if (seen === null) {
+      seenTripIdsRef.current = currentIds;
+      return;
+    }
+    for (const trip of trips) {
+      if (!seen.has(trip.id)) {
+        addToast(`New RITMO request received — ${trip.reference}.`, "info");
+      }
+    }
+    seenTripIdsRef.current = currentIds;
+  }, [trips, cursor, data, addToast]);
 
   // Car types for the "car type not available" fallback picker.
   const { data: vehicleTypes = [] } = useQuery({
@@ -244,6 +327,7 @@ export default function RitmoPage() {
           t.status,
           ...t.stops.map((s) => s.address),
           ...t.vehicles.map((v) => v.vehicle_type_name),
+          ...t.vehicles.map((v) => v.requested_vehicle_type_name),
           ...t.vehicles.flatMap((v) => v.pax.map((p) => `${p.name} ${p.phone}`)),
           ...t.vehicles.map((v) => v.active_offer?.vendor_name ?? ""),
         ]
@@ -290,6 +374,13 @@ export default function RitmoPage() {
 
   const [deciding, setDeciding] = useState<string | null>(null);
   const [decidingModification, setDecidingModification] = useState<string | null>(null);
+  const [pendingConfirm, setPendingConfirm] = useState<
+    | { kind: "accept"; vehicleId: string }
+    | { kind: "cancel"; vehicleId: string }
+    | { kind: "approveModification"; modificationId: string }
+    | { kind: "rejectModification"; modificationId: string }
+    | null
+  >(null);
   const [reassignModal, setReassignModal] = useState<{
     tripId: string;
     tripVehicleId: string;
@@ -621,7 +712,7 @@ export default function RitmoPage() {
                     {trip.modified_at && (
                       <span
                         className="inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded bg-success/10 text-success font-medium"
-                        title={`Details edited after booking on ${new Date(trip.modified_at).toLocaleString()}`}
+                        title={`Details edited after booking on ${formatDateTime(trip.modified_at)}`}
                       >
                         <Pencil className="w-3 h-3" />
                         Modified
@@ -636,7 +727,7 @@ export default function RitmoPage() {
                         title={
                           (trip.ritmo_last_push_error ? `${trip.ritmo_last_push_error} — ` : "") +
                           (trip.ritmo_last_pushed_at
-                            ? `last attempted ${new Date(trip.ritmo_last_pushed_at).toLocaleString()}`
+                            ? `last attempted ${formatDateTime(trip.ritmo_last_pushed_at)}`
                             : "")
                         }
                       >
@@ -652,7 +743,7 @@ export default function RitmoPage() {
                     )}
                   </div>
                   <p className="text-xs text-text-secondary mt-1">
-                    {trip.pickup_at ? new Date(trip.pickup_at).toLocaleString() : "—"}
+                    {trip.pickup_at ? formatDateTime(trip.pickup_at) : "—"}
                   </p>
                   {trip.stops.length > 0 && (
                     <div className="mt-1.5 flex items-start gap-1 text-xs text-text-secondary">
@@ -686,13 +777,13 @@ export default function RitmoPage() {
                   <div className="flex items-center gap-2 text-sm">
                     <Clock className="w-4 h-4 text-accent-gold shrink-0" />
                     <span className="text-text-primary">
-                      RITMO wants to move pickup from{" "}
+                      RITMO wants to move pickup from time {" "}
                       <span className="line-through text-text-tertiary">
-                        {new Date(trip.pending_modification.previous_pickup_at).toLocaleString()}
+                        {formatDateTime(trip.pending_modification.previous_pickup_at)}
                       </span>{" "}
                       to{" "}
                       <strong>
-                        {new Date(trip.pending_modification.requested_pickup_at).toLocaleString()}
+                        {formatDateTime(trip.pending_modification.requested_pickup_at)}
                       </strong>
                     </span>
                   </div>
@@ -703,7 +794,10 @@ export default function RitmoPage() {
                       className="bg-success! hover:bg-success/90! shadow-none!"
                       disabled={decidingModification === trip.pending_modification.modification_request_id}
                       onClick={() =>
-                        void approveModification(trip.pending_modification!.modification_request_id)
+                        setPendingConfirm({
+                          kind: "approveModification",
+                          modificationId: trip.pending_modification!.modification_request_id,
+                        })
                       }
                     >
                       <CheckCircle className="w-3.5 h-3.5" />
@@ -716,7 +810,10 @@ export default function RitmoPage() {
                       variant="danger"
                       disabled={decidingModification === trip.pending_modification.modification_request_id}
                       onClick={() =>
-                        void rejectModification(trip.pending_modification!.modification_request_id)
+                        setPendingConfirm({
+                          kind: "rejectModification",
+                          modificationId: trip.pending_modification!.modification_request_id,
+                        })
                       }
                     >
                       <X className="w-3.5 h-3.5" />
@@ -728,21 +825,31 @@ export default function RitmoPage() {
 
               <div className="mt-3 space-y-2">
                 {trip.vehicles.map((v) => {
-                  // Cancel is available right up until the slot is settled one way or the
-                  // other — a vendor took it, or it's already cancelled/no-show. Once settled,
-                  // there is nothing left for ops to decide.
-                  const canCancel = !SETTLED_VEHICLE_STATUSES.has(v.status);
+                  // Mirrors apps.trips.lifecycle.ALLOWED_TRANSITIONS: every pre-pickup status
+                  // (including ASSIGNED/DRIVER_ACCEPTED — accepted, reassigned, or a split
+                  // child) can still transition to CANCELLED server-side. Only once the
+                  // passenger has actually been picked up, or the slot already ended one way
+                  // or another, is there nothing left to cancel.
+                  const canCancel = !NOT_CANCELLABLE_VEHICLE_STATUSES.has(v.status);
                   return (
                   <div key={v.id} className="p-2.5 rounded border border-border bg-white">
                     <div className="flex items-center justify-between gap-3 flex-wrap">
                       <div className="flex items-center gap-2 text-sm">
                         <StatusBadge status={v.status as TripStatus} />
                         <span
-                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-brand-blue/10 text-brand-blue text-xs font-semibold"
-                          title="Car type requested by RITMO"
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${
+                            v.vehicle_type_name
+                              ? "bg-brand-blue/10 text-brand-blue"
+                              : "bg-danger/10 text-danger"
+                          }`}
+                          title={
+                            v.vehicle_type_name
+                              ? "Car type requested by RITMO"
+                              : "This car type isn't in the fleet — pick a vehicle to allot"
+                          }
                         >
                           <Car className="w-3.5 h-3.5" />
-                          {v.vehicle_type_name}
+                          {v.vehicle_type_name ?? v.requested_vehicle_type_name ?? "Unknown type"}
                         </span>
                         {v.split_from_trip_vehicle_id && (
                           <span
@@ -752,17 +859,11 @@ export default function RitmoPage() {
                             {v.split_reference ?? "Split"}
                           </span>
                         )}
-                        {v.pax.length > 0 && (
+                        {v.pax_count > 0 && (
                           <span className="flex items-center gap-1 text-xs text-text-secondary">
                             <User className="w-3.5 h-3.5 text-text-tertiary" />
-                            {v.pax[0]!.name}
-                            {v.pax[0]!.phone && (
-                              <span className="text-text-tertiary">· {v.pax[0]!.phone}</span>
-                            )}
+                            {v.pax_count} pax
                           </span>
-                        )}
-                        {v.pax_count > 1 && (
-                          <span className="text-xs text-text-tertiary">{v.pax_count} pax</span>
                         )}
                       </div>
 
@@ -802,6 +903,37 @@ export default function RitmoPage() {
                         </div>
                       ) : v.allottable ? (
                         (() => {
+                          // Booked against a type name that matched nothing in this tenant's
+                          // fleet at all (apps.trips.services.book_trip_unmatched_type) —
+                          // checked first server-side, before any city/availability logic runs.
+                          // The only path forward is picking a real vehicle by hand; there is
+                          // no "other type" to fall back to since none was ever resolved.
+                          if (v.alloc_reason === "type_not_in_fleet") {
+                            return (
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-danger whitespace-nowrap">
+                                  {v.requested_vehicle_type_name || "Requested type"} isn&apos;t in
+                                  this tenant&apos;s fleet —
+                                </span>
+                                <Button
+                                  size="sm"
+                                  variant="secondary"
+                                  onClick={() =>
+                                    setManualAllotModal({
+                                      tripVehicleId: v.id,
+                                      vehicleTypeName:
+                                        v.requested_vehicle_type_name || "any vehicle",
+                                      airportCode: trip.airport_code,
+                                      paxCount: v.pax_count,
+                                    })
+                                  }
+                                  title="Pick a vehicle that seats everyone — any type"
+                                >
+                                  Manually allot
+                                </Button>
+                              </div>
+                            );
+                          }
                           // No vendor operates in the request's city at all.
                           if (v.alloc_reason === "no_city_vendor") {
                             return (
@@ -813,27 +945,31 @@ export default function RitmoPage() {
                           // Vendors exist in the city, but none has the requested car type free.
                           // Offer an alternate car type; picking one re-runs auto-allot + auto-accept.
                           if (v.alloc_reason === "car_type_unavailable") {
+                            // Only reachable with a real matched type (type_not_in_fleet is
+                            // checked first, above) — vehicle_type_name is never null here.
+                            const typeName = v.vehicle_type_name ?? "";
                             return (
                               <div className="flex items-center gap-2">
                                 <span className="text-xs text-danger whitespace-nowrap">
-                                  {v.vehicle_type_name} not available in {trip.airport_code} —
+                                  {typeName} not available in {trip.airport_code} —
                                 </span>
                                 <div className="w-48">
                                   <SearchableSelect
-                                    options={vehicleTypeOptions.filter((o) => o.label !== v.vehicle_type_name)}
+                                    options={vehicleTypeOptions.filter((o) => o.label !== typeName)}
                                     value=""
                                     placeholder={allotting === v.id ? "Allotting…" : "Select other car type…"}
                                     onChange={(val) => void reallocateWithType(v.id, val)}
                                   />
                                 </div>
-                                {v.vehicle_type_capacity >= MIN_SPLITTABLE_CAPACITY && (
+                                {v.vehicle_type_capacity !== null &&
+                                  v.vehicle_type_capacity >= MIN_SPLITTABLE_CAPACITY && (
                                   <Button
                                     size="sm"
                                     variant="secondary"
                                     onClick={() =>
                                       setSplitModal({
                                         tripVehicleId: v.id,
-                                        vehicleTypeName: v.vehicle_type_name,
+                                        vehicleTypeName: typeName,
                                         paxCount: v.pax_count,
                                       })
                                     }
@@ -849,8 +985,16 @@ export default function RitmoPage() {
                           // path — auto-allots the first free vendor and accepts in one step.
                           // "Manually allot" is the override — ops browses every vendor's
                           // vehicle at this airport directly and picks one; the driver is still
-                          // auto-picked either way. Cancel renders once, below, alongside every
-                          // other case.
+                          // auto-picked either way. Split is offered here too, not just on
+                          // car_type_unavailable — per explicit instruction, any still-PENDING
+                          // 5+ seat request can be split proactively even when a single vehicle
+                          // of the requested type IS currently free. Cancel renders once, below,
+                          // alongside every other case.
+                          //
+                          // alloc_reason is "" here — type_not_in_fleet/no_city_vendor/
+                          // car_type_unavailable are all handled above — so a real matched
+                          // type is guaranteed; vehicle_type_name is never null.
+                          const typeName = v.vehicle_type_name ?? "";
                           return (
                             <div className="flex items-center gap-2">
                               <Button
@@ -858,7 +1002,7 @@ export default function RitmoPage() {
                                 variant="primary"
                                 className="bg-success! hover:bg-success/90! shadow-none!"
                                 disabled={deciding === v.id}
-                                onClick={() => void accept(v.id)}
+                                onClick={() => setPendingConfirm({ kind: "accept", vehicleId: v.id })}
                                 title="Auto-allot the first free vendor and accept"
                               >
                                 <CheckCircle className="w-3.5 h-3.5" />
@@ -870,7 +1014,7 @@ export default function RitmoPage() {
                                 onClick={() =>
                                   setManualAllotModal({
                                     tripVehicleId: v.id,
-                                    vehicleTypeName: v.vehicle_type_name,
+                                    vehicleTypeName: typeName,
                                     airportCode: trip.airport_code,
                                     paxCount: v.pax_count,
                                   })
@@ -879,6 +1023,23 @@ export default function RitmoPage() {
                               >
                                 Manually allot
                               </Button>
+                              {v.vehicle_type_capacity !== null &&
+                                v.vehicle_type_capacity >= MIN_SPLITTABLE_CAPACITY && (
+                                <Button
+                                  size="sm"
+                                  variant="secondary"
+                                  onClick={() =>
+                                    setSplitModal({
+                                      tripVehicleId: v.id,
+                                      vehicleTypeName: typeName,
+                                      paxCount: v.pax_count,
+                                    })
+                                  }
+                                  title="Seat everyone across several smaller vehicles instead"
+                                >
+                                  Split across vehicles
+                                </Button>
+                              )}
                             </div>
                           );
                         })()
@@ -938,7 +1099,7 @@ export default function RitmoPage() {
                           size="sm"
                           variant="danger"
                           disabled={deciding === v.id}
-                          onClick={() => void cancel(v.id)}
+                          onClick={() => setPendingConfirm({ kind: "cancel", vehicleId: v.id })}
                           title="Cancel this request"
                         >
                           <X className="w-3.5 h-3.5" />
@@ -988,6 +1149,48 @@ export default function RitmoPage() {
           vehicleTypeName={splitModal.vehicleTypeName}
           paxCount={splitModal.paxCount}
           onClose={() => setSplitModal(null)}
+        />
+      )}
+
+      {pendingConfirm && (
+        <ConfirmDialog
+          open
+          title={
+            pendingConfirm.kind === "accept"
+              ? "Accept this request?"
+              : pendingConfirm.kind === "cancel"
+                ? "Cancel this request?"
+                : pendingConfirm.kind === "approveModification"
+                  ? "Accept the pickup-time change?"
+                  : "Reject the pickup-time change?"
+          }
+          message={
+            pendingConfirm.kind === "accept"
+              ? "This auto-allots the first free vendor and confirms the trip with them."
+              : pendingConfirm.kind === "cancel"
+                ? "This cancels the request and best-effort notifies RITMO. This can't be undone."
+                : pendingConfirm.kind === "approveModification"
+                  ? "This updates the trip's pickup time to what RITMO requested."
+                  : "RITMO's requested pickup time will be declined; the trip keeps its current pickup time."
+          }
+          confirmLabel={
+            pendingConfirm.kind === "accept" || pendingConfirm.kind === "approveModification"
+              ? "Accept"
+              : pendingConfirm.kind === "cancel"
+                ? "Cancel request"
+                : "Reject"
+          }
+          cancelLabel="Back"
+          destructive={pendingConfirm.kind === "cancel" || pendingConfirm.kind === "rejectModification"}
+          onConfirm={() => {
+            const p = pendingConfirm;
+            setPendingConfirm(null);
+            if (p.kind === "accept") void accept(p.vehicleId);
+            else if (p.kind === "cancel") void cancel(p.vehicleId);
+            else if (p.kind === "approveModification") void approveModification(p.modificationId);
+            else void rejectModification(p.modificationId);
+          }}
+          onCancel={() => setPendingConfirm(null)}
         />
       )}
     </div>

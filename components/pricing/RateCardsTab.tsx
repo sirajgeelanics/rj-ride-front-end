@@ -480,8 +480,6 @@ export const RateCardsTab: React.FC<RateCardsTabProps> = ({ searchQuery = "" }) 
               options={[
                 { value: "PER_KM", label: t("perKm", language) },
                 { value: "HOURLY", label: t("hourly", language) },
-                { value: "PACKAGE", label: t("package", language) },
-                { value: "FIXED_LOCATION_PAIR", label: t("fixedPairs", language) },
               ]}
             />
           </FormField>

@@ -19,6 +19,15 @@ export type OfferEvent =
   | { type: "trip.offer_expired"; tripId: string; payload: Record<string, unknown> }
   | { type: "trip.offer_withdrawn"; tripId: string; payload: Record<string, unknown> };
 
+// RITMO pickup-time modification lifecycle (apps.trips.services): only ever raised for a
+// RITMO-origin trip (the request/cancel endpoints live under partner_api's RITMO surface) —
+// safe to treat as RITMO-specific on the receiving end.
+export type ModificationEvent =
+  | { type: "trip.modification_requested"; tripId: string; payload: Record<string, unknown> }
+  | { type: "trip.modification_applied"; tripId: string; payload: Record<string, unknown> }
+  | { type: "trip.modification_rejected"; tripId: string; payload: Record<string, unknown> }
+  | { type: "trip.modification_cancelled"; tripId: string; payload: Record<string, unknown> };
+
 export type BillingEvent =
   | { type: "billing.invoice_created"; invoiceId: string; payload: Record<string, unknown> }
   | { type: "billing.invoice_updated"; invoiceId: string; payload: Record<string, unknown> };
@@ -50,7 +59,8 @@ export type RideEvent =
   | BillingEvent
   | SosEvent
   | TrackingEvent
-  | DocumentEvent;
+  | DocumentEvent
+  | ModificationEvent;
 
 /**
  * Translate a server frame into a `RideEvent`.

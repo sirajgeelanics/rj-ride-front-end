@@ -11,6 +11,7 @@ import { Drawer } from "@/components/ui/Drawer";
 import { Input } from "@/components/ui/Input";
 import { FormField } from "@/components/ui/FormField";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
+import { MultiSelectFilter } from "@/components/ui/MultiSelectFilter";
 import { useToastStore } from "@/stores/toastStore";
 
 type VehicleName = components["schemas"]["VehicleName"];
@@ -46,13 +47,22 @@ export const VehicleNamesTab: React.FC<VehicleNamesTabProps> = ({ searchQuery = 
 
   const allNames = (data?.results ?? []) as VehicleName[];
   const vehicleTypes = (vtData?.results ?? []) as VehicleType[];
-  const names = searchQuery.trim()
+
+  // Vehicle-type ids to narrow the list to. Empty = no filter. Client-side — the whole catalog
+  // is already fetched in one go (fetchAllPages), unlike the paginated fleet Vehicles list.
+  const [vehicleTypeFilter, setVehicleTypeFilter] = useState<string[]>([]);
+  const vehicleTypeFilterOptions = vehicleTypes.map((vt) => ({ value: vt.id, label: vt.name }));
+
+  const bySearch = searchQuery.trim()
     ? allNames.filter(
         (n) =>
           n.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
           n.vehicle_type_name.toLowerCase().includes(searchQuery.toLowerCase()),
       )
     : allNames;
+  const names = vehicleTypeFilter.length
+    ? bySearch.filter((n) => vehicleTypeFilter.includes(n.vehicle_type))
+    : bySearch;
 
   const createMutation = useMutation({
     mutationFn: async (input: VehicleNameWriteInput) => {
@@ -185,6 +195,17 @@ export const VehicleNamesTab: React.FC<VehicleNamesTabProps> = ({ searchQuery = 
         <Button onClick={openCreate} variant="primary" size="sm">
           New Name
         </Button>
+      </div>
+
+      {/* Narrow the catalog to one or more vehicle types. */}
+      <div className="w-72">
+        <MultiSelectFilter
+          options={vehicleTypeFilterOptions}
+          selected={vehicleTypeFilter}
+          onChange={setVehicleTypeFilter}
+          placeholder="All vehicle types"
+          searchPlaceholder="Search vehicle types…"
+        />
       </div>
 
       <QueryBoundary

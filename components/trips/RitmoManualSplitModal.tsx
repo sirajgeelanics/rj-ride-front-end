@@ -158,18 +158,28 @@ export const RitmoManualSplitModal: React.FC<RitmoManualSplitModalProps> = ({
             candidates.map((c) => {
               const checked = selectedIds.includes(c.vehicle_id);
               const pickOrder = checked ? selectedIds.indexOf(c.vehicle_id) + 1 : null;
+              // Once the pax count is already covered, adding another vehicle can only ever
+              // be an unnecessary extra allotment — lock the remaining unchecked rows rather
+              // than let ops keep piling more vehicles onto an already-satisfied split. An
+              // already-checked row stays toggleable, so backing out a pick is never blocked.
+              const lockedOut = !checked && covered;
               return (
                 <label
                   key={c.vehicle_id}
-                  className={`flex items-center gap-2.5 p-2 rounded border cursor-pointer text-sm ${
-                    checked ? "border-brand-blue/40 bg-brand-blue/5" : "border-border bg-white"
+                  className={`flex items-center gap-2.5 p-2 rounded border text-sm ${
+                    checked
+                      ? "border-brand-blue/40 bg-brand-blue/5 cursor-pointer"
+                      : lockedOut
+                        ? "border-border bg-ops-card2 opacity-50 cursor-not-allowed"
+                        : "border-border bg-white cursor-pointer"
                   }`}
                 >
                   <input
                     type="checkbox"
                     checked={checked}
+                    disabled={lockedOut}
                     onChange={() => toggle(c.vehicle_id)}
-                    className="w-4 h-4"
+                    className="w-4 h-4 disabled:cursor-not-allowed"
                   />
                   <span className="flex-1 min-w-0">
                     <span className="text-text-primary font-medium">
