@@ -90,13 +90,19 @@ interface RitmoTrip {
   customer_name: string | null;
   stops: { kind: string; address: string }[];
   vehicles: RitmoVehicle[];
-  // Set when RITMO has submitted a pickup-time change that's waiting on ops to approve/reject
-  // (apps.trips.models.TripModificationRequest) — null once resolved one way or another, or if
-  // RITMO withdrew it first via its own cancel endpoint. At most one at a time per trip.
+  // Set when RITMO has submitted a pickup-time and/or passenger-count change that's waiting on
+  // ops to approve/reject (apps.trips.models.TripModificationRequest) — null once resolved one
+  // way or another, or if RITMO withdrew it first via its own cancel endpoint. At most one at a
+  // time per trip. A row can carry either change, or both at once — the *_pickup_at pair is null
+  // for a pax-only request, and requested_pax_count is null for a time-only one (never both
+  // null — see the model's own "changes something" constraint).
   pending_modification: {
     modification_request_id: string;
-    requested_pickup_at: string;
-    previous_pickup_at: string;
+    requested_pickup_at: string | null;
+    previous_pickup_at: string | null;
+    requested_pax_count: number | null;
+    previous_pax_count: number | null;
+    pax_delta: number | null;
     requested_at: string;
   } | null;
 }
@@ -774,18 +780,43 @@ export default function RitmoPage() {
 
               {trip.pending_modification && (
                 <div className="mt-3 p-2.5 rounded border border-accent-gold/40 bg-accent-gold/10 flex items-center justify-between gap-3 flex-wrap">
-                  <div className="flex items-center gap-2 text-sm">
-                    <Clock className="w-4 h-4 text-accent-gold shrink-0" />
-                    <span className="text-text-primary">
-                      RITMO wants to move pickup from time {" "}
-                      <span className="line-through text-text-tertiary">
-                        {formatDateTime(trip.pending_modification.previous_pickup_at)}
-                      </span>{" "}
-                      to{" "}
-                      <strong>
-                        {formatDateTime(trip.pending_modification.requested_pickup_at)}
-                      </strong>
-                    </span>
+                  <div className="flex flex-col gap-1 text-sm">
+                    {trip.pending_modification.requested_pickup_at && (
+                      <span className="flex items-center gap-2 text-text-primary">
+                        <Clock className="w-4 h-4 text-accent-gold shrink-0" />
+                        RITMO wants to move pickup from time{" "}
+                        <span className="line-through text-text-tertiary">
+                          {formatDateTime(trip.pending_modification.previous_pickup_at!)}
+                        </span>{" "}
+                        to{" "}
+                        <strong>
+                          {formatDateTime(trip.pending_modification.requested_pickup_at)}
+                        </strong>
+                      </span>
+                    )}
+                    {trip.pending_modification.requested_pax_count !== null && (
+                      <span className="flex items-center gap-2 text-text-primary">
+                        <User className="w-4 h-4 text-accent-gold shrink-0" />
+                        RITMO wants to change passenger count from{" "}
+                        <span className="line-through text-text-tertiary">
+                          {trip.pending_modification.previous_pax_count}
+                        </span>{" "}
+                        to{" "}
+                        <strong>{trip.pending_modification.requested_pax_count}</strong>
+                        {trip.pending_modification.pax_delta !== null && (
+                          <span
+                            className={`text-xs font-semibold px-1.5 py-0.5 rounded ${
+                              trip.pending_modification.pax_delta >= 0
+                                ? "bg-success/10 text-success"
+                                : "bg-danger/10 text-danger"
+                            }`}
+                          >
+                            {trip.pending_modification.pax_delta >= 0 ? "+" : ""}
+                            {trip.pending_modification.pax_delta} pax
+                          </span>
+                        )}
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center gap-2">
                     <Button
