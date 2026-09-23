@@ -35,6 +35,13 @@ interface RateCardsTabProps {
   searchQuery?: string;
 }
 
+// Symbols for the currencies actually in use across tenants today (core.money.DEFAULT_CURRENCY
+// is "USD" platform-wide, but individual tenants price in their own real currency — JBM, kaif,
+// chaudhary, and delhi vendor are all INR; Hubballi is USD; Gulf Express is AED). Only used for
+// the rate-input label here; formatMoney (table display) already derives the correct symbol via
+// Intl.NumberFormat from the row's own currency, no map needed there.
+const CURRENCY_SYMBOL: Record<string, string> = { USD: "$", INR: "₹", AED: "AED" };
+
 // The backend RateCardWriteSerializer expects `vendor`/`vehicle_type` (not the `_id`-suffixed
 // form-state names). Rate cards are keyed by vendor x vehicle type — no customer. Map before
 // sending or the POST 400s ("vendor is required").
@@ -319,12 +326,21 @@ export const RateCardsTab: React.FC<RateCardsTabProps> = ({ searchQuery = "" }) 
     {
       key: "rate_per_km_minor",
       header: t("perKm", language),
-      render: (val): React.ReactNode => (val ? formatMoney(val as number, "USD") : t("dash", language)),
+      // Per explicit instruction: show each card's OWN currency (INR for JBM/kaif/chaudhary/
+      // delhi vendor, USD for Hubballi, ...) — was hardcoded to "USD" regardless of the row's
+      // real stored currency, so an INR card still rendered with a $ sign.
+      render: (val, row): React.ReactNode =>
+        val
+          ? formatMoney(val as number, ((row as Record<string, unknown>).currency as string) || "USD")
+          : t("dash", language),
     },
     {
       key: "rate_per_hour_minor",
       header: t("hourly", language),
-      render: (val): React.ReactNode => (val ? formatMoney(val as number, "USD") : t("dash", language)),
+      render: (val, row): React.ReactNode =>
+        val
+          ? formatMoney(val as number, ((row as Record<string, unknown>).currency as string) || "USD")
+          : t("dash", language),
     },
     { key: "valid_from", header: t("validFrom", language), sortable: true },
     {
@@ -484,8 +500,24 @@ export const RateCardsTab: React.FC<RateCardsTabProps> = ({ searchQuery = "" }) 
             />
           </FormField>
 
+          {/* Per explicit instruction: rate cards must show/enter in the tenant's own real
+              currency (INR for JBM/kaif/chaudhary/delhi vendor, USD for Hubballi, ...) — this
+              field didn't exist before, so every new rate card silently defaulted to USD
+              regardless of the tenant, which is what caused JBM's own rates to read in $. */}
+          <FormField label={t("currency", language)}>
+            <Select
+              value={formData.currency ?? "USD"}
+              onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
+              options={[
+                { value: "USD", label: "USD ($)" },
+                { value: "INR", label: "INR (₹)" },
+                { value: "AED", label: "AED" },
+              ]}
+            />
+          </FormField>
+
           {formData.basis === "PER_KM" && (
-            <FormField label={`${t("ratePerKm", language)} ($)`}>
+            <FormField label={`${t("ratePerKm", language)} (${CURRENCY_SYMBOL[formData.currency ?? "USD"] ?? formData.currency})`}>
               <Input
                 type="number"
                 min="0"
@@ -498,7 +530,7 @@ export const RateCardsTab: React.FC<RateCardsTabProps> = ({ searchQuery = "" }) 
           )}
 
           {formData.basis === "HOURLY" && (
-            <FormField label={`${t("hourlyRate", language)} ($)`}>
+            <FormField label={`${t("hourlyRate", language)} (${CURRENCY_SYMBOL[formData.currency ?? "USD"] ?? formData.currency})`}>
               <Input
                 type="number"
                 min="0"
