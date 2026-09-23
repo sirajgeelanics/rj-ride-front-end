@@ -508,7 +508,7 @@ export default function RitmoPage() {
   const rejectModification = async (modificationId: string) => {
     setDecidingModification(modificationId);
     try {
-      const resp = await csrfFetch(`/api/v1/ritmo/modifications/${modificationId}/reject/`, {
+      const resp = await csrfFetch(`/api/v1/ritmo/modifications/reject/${modificationId}/`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },

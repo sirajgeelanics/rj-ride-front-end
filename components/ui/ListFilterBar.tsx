@@ -36,7 +36,7 @@ export const ListFilterBar: React.FC<ListFilterBarProps> = ({
 
   return (
     <div className={`flex flex-wrap items-end gap-3 ${className}`}>
-      <div className="relative flex-1 min-w-[16rem]">
+      <div className="relative flex-1 min-w-0 sm:min-w-[16rem]">
         <label className="block text-xs text-text-secondary mb-1">Search</label>
         <Search className="w-4 h-4 absolute left-3 top-[2.1rem] text-text-tertiary" />
         <input

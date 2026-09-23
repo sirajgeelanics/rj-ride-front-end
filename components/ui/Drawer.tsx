@@ -12,10 +12,10 @@ interface DrawerProps {
 }
 
 const widthMap = {
-  md: "w-96",
-  lg: "w-[28rem]",
-  xl: "w-[32rem]",
-  "2xl": "w-[48rem]",
+  md: "w-full sm:w-96",
+  lg: "w-full sm:w-[28rem]",
+  xl: "w-full sm:w-[32rem]",
+  "2xl": "w-full sm:w-[48rem]",
 };
 
 export const Drawer: React.FC<DrawerProps> = ({ open, onClose, title, children, width = "lg" }) => {

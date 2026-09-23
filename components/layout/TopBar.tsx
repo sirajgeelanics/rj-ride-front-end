@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Radio } from "lucide-react";
+import { Menu, Radio } from "lucide-react";
 import { useAuth, useLanguageStore, t } from "@/lib/shared";
 import { NAV_ITEMS } from "@/components/layout/Sidebar";
 
@@ -13,7 +13,11 @@ const ROLE_LABEL: Record<string, string> = {
   DRIVER: "Driver",
 };
 
-export const TopBar: React.FC = () => {
+interface TopBarProps {
+  onMenuClick?: () => void;
+}
+
+export const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
   const { user, logout } = useAuth();
   const language = useLanguageStore((s) => s.language);
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -38,19 +42,26 @@ export const TopBar: React.FC = () => {
 
   return (
     // FL8 header: sticky, compact (h-14), hairline bottom border, translucent cream with backdrop blur.
-    <header className="h-14 border-b border-border bg-ops-bg/80 backdrop-blur supports-[backdrop-filter]:bg-ops-bg/70 flex items-center justify-between px-5 sticky top-0 z-30">
-      <div className="flex items-center gap-3">
-        <h1 className="text-3xl font-bold text-text-primary">{moduleName}</h1>
+    <header className="h-14 border-b border-border bg-ops-bg/80 backdrop-blur supports-[backdrop-filter]:bg-ops-bg/70 flex items-center justify-between px-3 sm:px-5 sticky top-0 z-30">
+      <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+        <button
+          onClick={onMenuClick}
+          className="lg:hidden p-1.5 -ml-1 rounded-md text-text-secondary hover:bg-ops-card2 hover:text-text-primary transition-colors flex-shrink-0"
+          aria-label="Open navigation menu"
+        >
+          <Menu className="w-5 h-5" />
+        </button>
+        <h1 className="text-xl lg:text-3xl font-bold text-text-primary truncate">{moduleName}</h1>
       </div>
 
       <div className="flex items-center gap-3 lg:gap-4">
         <Link
           href="/availability"
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-white text-sm font-medium text-text-secondary hover:bg-ops-card2 hover:text-text-primary transition-colors"
+          className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg border border-border bg-white text-sm font-medium text-text-secondary hover:bg-ops-card2 hover:text-text-primary transition-colors"
           title="Fleet availability — synced to RITMO automatically"
         >
           <Radio className="w-4 h-4 text-brand-wine" />
-          Availability
+          <span className="hidden sm:inline">Availability</span>
         </Link>
 
         {/* Profile — dropdown menu matching the vendor portal's Header pattern. */}

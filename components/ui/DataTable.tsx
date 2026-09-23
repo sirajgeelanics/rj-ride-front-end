@@ -110,7 +110,7 @@ export const DataTable = React.forwardRef<HTMLDivElement, DataTableProps>(
         </div>
 
         {totalPages > 1 && (
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <p className="text-xs text-text-secondary">
               Page {page + 1} of {totalPages}
             </p>

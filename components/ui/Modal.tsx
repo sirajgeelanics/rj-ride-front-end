@@ -12,9 +12,9 @@ interface ModalProps {
 }
 
 const sizeMap = {
-  sm: "w-96",
-  md: "w-[28rem]",
-  lg: "w-[36rem]",
+  sm: "w-[calc(100vw-2rem)] sm:w-96",
+  md: "w-[calc(100vw-2rem)] sm:w-[28rem]",
+  lg: "w-[calc(100vw-2rem)] sm:w-[36rem]",
 };
 
 export const Modal: React.FC<ModalProps> = ({ open, onClose, title, children, size = "md" }) => {
