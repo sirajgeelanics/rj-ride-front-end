@@ -19,10 +19,13 @@ import { HealthStrip } from "@/components/configuration/HealthStrip";
 import { DriverLoginPanel } from "@/components/configuration/DriverLoginPanel";
 import { MultiSelectFilter } from "@/components/ui/MultiSelectFilter";
 import { useToastStore } from "@/stores/toastStore";
+import { splitAirportCodes } from "@/lib/airportCodes";
 
 type ApiDriver = components["schemas"]["Driver"];
 type PatchedDriver = components["schemas"]["PatchedDriver"];
-type ApiVendor = components["schemas"]["Vendor"];
+// airport_code is served by the API but missing from the generated Vendor schema (stale since the
+// city -> airport_code rename).
+type ApiVendor = components["schemas"]["Vendor"] & { airport_code?: string | null };
 
 interface DriverFormState {
   vendor: string;
@@ -30,6 +33,8 @@ interface DriverFormState {
   phone: string;
   licence_number: string;
   status: string;
+  // Only meaningful (and only shown) when the vendor operates at more than one airport.
+  airport_code: string;
   is_active: boolean;
   // Create-only: optionally provision the driver's mobile-app login in the same step (mirrors
   // DriverLoginPanel's own create form). Both blank on edit — logins on an existing driver are
@@ -159,7 +164,7 @@ export const DriversTab: React.FC<DriversTabProps> = ({ searchQuery = "" }) => {
   // Deactivation asks for confirmation first (it removes the driver from the roster).
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; label: string } | null>(null);
 
-  const emptyForm: DriverFormState = { vendor: "", name: "", phone: "", licence_number: "", status: "AVAILABLE", is_active: true, email: "", password: "" };
+  const emptyForm: DriverFormState = { vendor: "", name: "", phone: "", licence_number: "", status: "AVAILABLE", airport_code: "", is_active: true, email: "", password: "" };
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState<DriverFormState>(emptyForm);
@@ -180,6 +185,7 @@ export const DriversTab: React.FC<DriversTabProps> = ({ searchQuery = "" }) => {
       phone: "",
       licence_number: "",
       status: driver.status ?? "AVAILABLE",
+      airport_code: driver.airport_code ?? "",
       is_active: driver.is_active,
       email: "",
       password: "",
@@ -187,9 +193,18 @@ export const DriversTab: React.FC<DriversTabProps> = ({ searchQuery = "" }) => {
     setDrawerOpen(true);
   };
 
+  const selectedVendor = vendors.find((v) => v.id === formData.vendor);
+  const vendorAirportCodes = splitAirportCodes(selectedVendor?.airport_code);
+  const showAirport = vendorAirportCodes.length > 1;
+  const airportOptions = vendorAirportCodes.map((c) => ({ value: c, label: c }));
+
   const handleSave = () => {
     if (!formData.vendor || !formData.name.trim()) {
       addToast("Vendor and name are required", "error");
+      return;
+    }
+    if (showAirport && !editingId && !formData.airport_code) {
+      addToast("Select the airport this driver operates from", "error");
       return;
     }
     if (editingId) {
@@ -198,6 +213,7 @@ export const DriversTab: React.FC<DriversTabProps> = ({ searchQuery = "" }) => {
         vendor: formData.vendor,
         name: formData.name.trim(),
         status: formData.status,
+        airport_code: showAirport ? formData.airport_code : "",
         is_active: formData.is_active,
       };
       if (formData.phone.trim()) input.phone = formData.phone.trim();
@@ -221,6 +237,7 @@ export const DriversTab: React.FC<DriversTabProps> = ({ searchQuery = "" }) => {
       phone: formData.phone.trim(),
       licence_number: formData.licence_number.trim(),
       status: formData.status,
+      airport_code: showAirport ? formData.airport_code : "",
       is_active: formData.is_active,
       // Optional: provisions a mobile-app login in the same step, with the password the ops
       // user chose here — never auto-generated. Omitted entirely when blank (no login created).
@@ -244,6 +261,15 @@ export const DriversTab: React.FC<DriversTabProps> = ({ searchQuery = "" }) => {
       key: "phone",
       header: t("phone", language),
       render: (val): React.ReactNode => <PII value={val as string} type="phone" />,
+    },
+    {
+      key: "airport_code",
+      header: "Airport",
+      render: (val, row): React.ReactNode => {
+        if (val) return val as string;
+        const owner = vendors.find((v) => v.id === (row as Record<string, unknown>).vendor);
+        return splitAirportCodes(owner?.airport_code).join(", ") || t("dash", language);
+      },
     },
     {
       key: "status",
@@ -298,9 +324,11 @@ export const DriversTab: React.FC<DriversTabProps> = ({ searchQuery = "" }) => {
         <h3 className="font-semibold text-ops-sidebar">
           {t("drivers", language)} ({drivers.length})
         </h3>
-        <Button onClick={openCreate} variant="primary" size="sm">
-          New Driver
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button onClick={openCreate} variant="primary" size="sm">
+            New Driver
+          </Button>
+        </div>
       </div>
 
       <HealthStrip expiredCount={0} expiringCount={0} />
@@ -342,10 +370,24 @@ export const DriversTab: React.FC<DriversTabProps> = ({ searchQuery = "" }) => {
             <SearchableSelect
               options={vendorOptions.filter((o) => o.value)}
               value={formData.vendor}
-              onChange={(val) => setFormData({ ...formData, vendor: val })}
+              onChange={(val) => setFormData({ ...formData, vendor: val, airport_code: "" })}
               placeholder="Search vendor…"
             />
           </FormField>
+
+          {showAirport && (
+            <FormField label="Airport" required={!editingId}>
+              <SearchableSelect
+                options={airportOptions}
+                value={formData.airport_code}
+                onChange={(val) => setFormData({ ...formData, airport_code: val })}
+                placeholder="Select airport…"
+              />
+              <p className="text-xs text-text-secondary mt-1">
+                This vendor operates at several airports — pick where this driver works from.
+              </p>
+            </FormField>
+          )}
 
           <FormField label={t("driverName", language)} required>
             <Input

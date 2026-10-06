@@ -77,7 +77,7 @@ export const CalendarDialog: React.FC<CalendarDialogProps> = ({
       aria-modal="true"
       tabIndex={-1}
     >
-      <div className="bg-white rounded-2xl shadow-xl w-[340px] overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-modal animate-modal-in w-[340px] overflow-hidden">
         {/* Header banner — the currently selected date, Material style */}
         <div className="bg-brand-blue px-6 py-5">
           <p className="text-white/70 text-[11px] font-semibold tracking-wide mb-1">{title}</p>

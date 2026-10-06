@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/Button";
 import { PII } from "@/components/ui/PII";
 import { DateTimePicker } from "@/components/ui/DateTimePicker";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
+import { splitAirportCodes } from "@/lib/airportCodes";
 import { Building2, Car, Radio, RefreshCw, Search, User, X } from "lucide-react";
 
 type Vendor = components["schemas"]["Vendor"];
@@ -102,8 +103,9 @@ export default function AvailabilityPage() {
   const cities = useMemo(() => {
     const set = new Set<string>();
     for (const v of (vendorsQ.data?.results ?? []) as Vendor[]) {
-      const code = (v as { airport_code?: string }).airport_code;
-      if (code) set.add(code);
+      for (const code of splitAirportCodes((v as { airport_code?: string }).airport_code)) {
+        set.add(code);
+      }
     }
     return [...set].sort();
   }, [vendorsQ.data]);
@@ -153,15 +155,15 @@ export default function AvailabilityPage() {
   const loading = snapshotQ.isLoading;
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-[1600px] mx-auto w-full space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-start gap-4">
           <div>
-            <h1 className="text-lg font-semibold text-text-primary flex items-center gap-2">
-              <Radio className="w-5 h-5 text-brand-wine" />
+            <h1 className="font-serif text-2xl font-medium tracking-tight text-text-primary flex items-center gap-2">
+              <Radio className="w-5 h-5 text-accent-gold" />
               Fleet Availability
             </h1>
-            <p className="text-xs text-text-secondary mt-0.5">
+            <p className="text-sm text-text-secondary mt-1">
               Cars and drivers free right now, across every vendor — updates the moment one is taken or freed.
             </p>
           </div>
@@ -223,7 +225,7 @@ export default function AvailabilityPage() {
       </Card>
 
       {loading ? (
-        <div className="py-10 text-center text-sm text-text-secondary">Loading availability…</div>
+        <div className="py-10 text-center text-sm text-text-secondary animate-pulse">Loading availability…</div>
       ) : snapshotQ.isError ? (
         <Card padding="lg" className="bg-white text-center text-text-secondary py-10">
           <p>Could not load availability. Refresh to try again.</p>
@@ -238,7 +240,7 @@ export default function AvailabilityPage() {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search by plate, model, driver, or vendor…"
-                className="w-full pl-9 pr-9 py-2 bg-white border border-border rounded-lg text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-blue"
+                className="w-full pl-9 pr-9 h-10 bg-white border border-border rounded-lg text-sm text-text-primary hover:border-[#C2C7CF] transition-[border-color,box-shadow] focus:outline-none focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue"
               />
               {search && (
                 <button
@@ -314,9 +316,9 @@ export default function AvailabilityPage() {
               </p>
             ) : (
               <div className="mt-3 space-y-1.5 max-h-[60vh] overflow-y-auto pr-1">
-                {drivers.map((d) => (
+                {drivers.map((d, i) => (
                   <div
-                    key={`${d.name}-${d.vendor}`}
+                    key={`${d.name}-${d.vendor}-${i}`}
                     className="flex items-center justify-between gap-2 p-2.5 rounded-lg border border-border bg-white hover:bg-ops-bg/60 transition-colors"
                   >
                     <span className="text-sm font-medium text-text-primary">

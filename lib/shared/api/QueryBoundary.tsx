@@ -42,18 +42,18 @@ export function QueryBoundary({
 
 function DefaultLoadingState(): React.ReactElement {
   return (
-    <div className="flex items-center justify-center py-12 text-sm text-text-secondary">
-      <div className="flex items-center gap-2">
-        <span className="animate-spin inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full" />
-        Loading…
-      </div>
+    <div className="py-6 space-y-2.5" role="status" aria-label="Loading">
+      <div className="skeleton h-10 w-full" />
+      <div className="skeleton h-12 w-full" />
+      <div className="skeleton h-12 w-full" />
+      <div className="skeleton h-12 w-4/5" />
     </div>
   );
 }
 
 function DefaultEmptyState(): React.ReactElement {
   return (
-    <div className="py-12 text-center text-sm text-text-secondary">
+    <div className="py-12 text-center text-sm text-text-secondary border border-dashed border-border rounded-2xl bg-white">
       No results found.
     </div>
   );
@@ -62,7 +62,7 @@ function DefaultEmptyState(): React.ReactElement {
 function PermissionDeniedState(): React.ReactElement {
   return (
     <div className="py-12 text-center">
-      <p className="text-sm font-medium text-red-500">Access denied</p>
+      <p className="text-sm font-medium text-danger">Access denied</p>
       <p className="text-xs text-text-secondary mt-1">
         You do not have permission to view this resource.
       </p>
@@ -79,7 +79,7 @@ function ErrorState({ error }: { error: unknown }): React.ReactElement {
 
   return (
     <div className="py-12 text-center">
-      <p className="text-sm font-medium text-red-500">Error</p>
+      <p className="text-sm font-medium text-danger">Error</p>
       <p className="text-xs text-text-secondary mt-1">{msg}</p>
     </div>
   );

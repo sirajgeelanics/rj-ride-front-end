@@ -14,6 +14,7 @@ import { FormField } from "@/components/ui/FormField";
 import { PII } from "@/components/ui/PII";
 import { VendorLoginPanel } from "@/components/configuration/VendorLoginPanel";
 import { useToastStore } from "@/stores/toastStore";
+import { splitAirportCodes } from "@/lib/airportCodes";
 
 type Vendor = components["schemas"]["Vendor"];
 type PatchedVendor = components["schemas"]["PatchedVendor"];
@@ -176,7 +177,7 @@ export const VendorsTab: React.FC<VendorsTabProps> = ({ searchQuery = "" }) => {
       addToast("A portal password (min 8 characters) is required to create this vendor's login.", "error");
       return;
     }
-    const airportCode = (formData.airport_code ?? "").trim();
+    const airportCode = splitAirportCodes(formData.airport_code).join(",");
     const input: VendorWriteInput = {
       name: formData.name,
       contact_name: formData.contact_name || undefined,
@@ -331,16 +332,19 @@ export const VendorsTab: React.FC<VendorsTabProps> = ({ searchQuery = "" }) => {
             </FormField>
           )}
 
-          {editingId && <VendorLoginPanel vendorId={editingId} vendorEmail={formData.contact_email ?? ""} />}
+          {editingId && (
+            <VendorLoginPanel key={editingId} vendorId={editingId} vendorEmail={formData.contact_email ?? ""} />
+          )}
 
           <FormField label="Airport Code">
             <Input
               value={formData.airport_code ?? ""}
               onChange={(e) => setFormData({ ...formData, airport_code: e.target.value || undefined })}
-              placeholder="e.g., DEL, BLR"
+              placeholder="e.g., BLR or BLR, HBX"
             />
             <p className="text-xs text-text-secondary mt-1">
-              Operating airport code — feeds the fleet filter, RITMO auto-dispatch and availability.
+              Airports this vendor serves — separate several with commas. Feeds the fleet filter, RITMO
+              auto-dispatch and availability. One dispatch priority applies at every listed airport.
             </p>
           </FormField>
 

@@ -16,7 +16,7 @@
   --color-ops-card2: #F1EEE9;     /* subtle warm panel */
   --color-brand-blue: #072D62;    /* wine primary       (hsl 343 55% 45%) — name kept, value is FL8 wine */
   --color-brand-wine: #072D62;
-  --color-brand-wine-hover: #962C4A;
+  --color-brand-wine-hover: #0E3F82;
   --color-accent-gold: #B39661;   /* muted gold accent  (hsl 39 35% 54%) */
   --color-success: #1F7A44;
   --color-alert-amber: #C68A3E;
@@ -25,6 +25,19 @@
   --color-text-secondary: #636874;
   --color-text-tertiary: #8A909C;
   --color-border: #DCDFE4;
+
+  --color-brand-blue-deep: #04204A;
+  --color-ops-line: #E8E4DD;      /* hairline on cream surfaces */
+  --color-success-soft: #E6F2EA;
+  --color-amber-soft: #FBF1E1;
+  --color-danger-soft: #FBE9E5;
+  --color-navy-soft: #E8EEF7;
+  --color-gold-soft: #F5EEDF;
+
+  --shadow-soft: 0 1px 2px rgba(7, 45, 98, 0.04), 0 2px 8px rgba(7, 45, 98, 0.05);
+  --shadow-lift: 0 4px 12px rgba(7, 45, 98, 0.08), 0 14px 32px rgba(7, 45, 98, 0.1);
+  --shadow-modal: 0 24px 64px rgba(4, 32, 74, 0.28), 0 4px 16px rgba(4, 32, 74, 0.12);
+  --shadow-inset-top: inset 0 1px 0 rgba(255, 255, 255, 0.14);
 
   --font-sans: 'Inter', system-ui, sans-serif;
   --font-serif: 'EB Garamond', Georgia, serif;
@@ -288,4 +301,204 @@ body ::-webkit-scrollbar-thumb:hover {
 
 .status-sos {
   @apply bg-danger text-white font-bold animate-pulse;
+}
+
+/* ------------------------------------------------------------------ *
+ * Motion & elevation layer — shared by both RIDE portals.            *
+ * Everything below is CSS-only (no JS animation deps) and is switched *
+ * off wholesale by `prefers-reduced-motion`.                         *
+ * ------------------------------------------------------------------ */
+:root {
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+  ::selection {
+    background: rgba(7, 45, 98, 0.16);
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-brand-blue);
+    outline-offset: 2px;
+  }
+  button,
+  [role="button"],
+  a {
+    transition-duration: 160ms;
+  }
+}
+
+/* Every button/link eases (not snaps) between states and gives a tactile press. */
+button,
+[role="button"] {
+  transition-property: color, background-color, border-color, box-shadow, opacity, scale;
+  transition-timing-function: var(--ease-out-expo);
+}
+button:not(:disabled):active,
+[role="button"]:active {
+  scale: 0.97;
+}
+
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.985);
+  }
+}
+@keyframes slide-in-left {
+  from {
+    opacity: 0;
+    transform: translateX(-100%);
+  }
+}
+@keyframes slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+@keyframes float-slow {
+  0%, 100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(0, -18px, 0);
+  }
+}
+
+/* `backwards` (not `both`): once finished no transform remains, so the wrapper does not become
+   a containing block for position:fixed modals/drawers rendered inside a page. */
+.animate-page-enter {
+  animation: page-enter 0.45s var(--ease-out-expo) backwards;
+}
+.animate-rise-in {
+  animation: rise-in 0.5s var(--ease-out-expo) backwards;
+}
+.animate-slide-in-left {
+  animation: slide-in-left 0.32s var(--ease-out-expo);
+}
+.animate-slide-in-right {
+  animation: slide-in-right 0.35s var(--ease-out-expo);
+}
+.animate-fade-in {
+  animation: fade-in 0.25s ease-out;
+}
+.animate-float-slow {
+  animation: float-slow 9s ease-in-out infinite;
+}
+
+/* Cascade children in one after another: <div className="stagger">. */
+.stagger > * {
+  animation: rise-in 0.5s var(--ease-out-expo) backwards;
+}
+.stagger > *:nth-child(1) { animation-delay: 0ms; }
+.stagger > *:nth-child(2) { animation-delay: 50ms; }
+.stagger > *:nth-child(3) { animation-delay: 100ms; }
+.stagger > *:nth-child(4) { animation-delay: 150ms; }
+.stagger > *:nth-child(5) { animation-delay: 200ms; }
+.stagger > *:nth-child(6) { animation-delay: 250ms; }
+.stagger > *:nth-child(7) { animation-delay: 300ms; }
+.stagger > *:nth-child(8) { animation-delay: 350ms; }
+.stagger > *:nth-child(n + 9) { animation-delay: 400ms; }
+
+/* Elevation on hover: cards float up and gain a soft navy-tinted shadow. */
+.hover-lift {
+  transition: transform 0.28s var(--ease-out-expo), box-shadow 0.28s var(--ease-out-expo),
+    border-color 0.2s ease;
+}
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lift);
+  border-color: rgba(7, 45, 98, 0.25);
+}
+.card-soft {
+  box-shadow: var(--shadow-soft);
+}
+
+/* Loading placeholder: a light sweep instead of a flat pulse. */
+.skeleton {
+  background: linear-gradient(90deg, #f1eee9 25%, #faf8f5 50%, #f1eee9 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
+  border-radius: 0.5rem;
+}
+
+/* Premium primitives ------------------------------------------------ */
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.97);
+  }
+}
+@keyframes menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.97);
+  }
+}
+.animate-modal-in {
+  animation: modal-in 0.32s var(--ease-out-expo) backwards;
+}
+.animate-menu-in {
+  animation: menu-in 0.18s var(--ease-out-expo) backwards;
+  transform-origin: top right;
+}
+
+/* Navy hero surface with a top highlight (primary buttons, header cards, wordmark tiles). */
+.surface-navy {
+  background: linear-gradient(135deg, #072d62 0%, #0e3f82 100%);
+  box-shadow: var(--shadow-soft), var(--shadow-inset-top);
+}
+/* Glass bar (sticky headers). */
+.glass {
+  background: rgba(247, 245, 243, 0.78);
+  backdrop-filter: blur(14px) saturate(1.4);
+  -webkit-backdrop-filter: blur(14px) saturate(1.4);
+}
+/* Uppercase micro-label used for table heads, nav groups, stat captions. */
+.eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+  button:not(:disabled):active,
+  [role="button"]:active {
+    scale: 1;
+  }
 }

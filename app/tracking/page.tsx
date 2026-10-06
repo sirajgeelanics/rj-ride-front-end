@@ -93,7 +93,7 @@ function toTrackDetail(raw: RawTrackResult | null | undefined): TrackDetail | nu
 const LiveMapComponent = dynamic(() => import("@/components/tracking/LiveMapComponent"), {
   ssr: false,
   loading: () => (
-    <div className="h-80 bg-ops-bg rounded flex items-center justify-center text-text-secondary text-sm">
+    <div className="h-80 skeleton flex items-center justify-center text-text-secondary text-sm">
       Loading map…
     </div>
   ),
@@ -211,40 +211,40 @@ export default function TrackingPage() {
   const sosCount = positions.filter((p) => p.status === "SOS").length;
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-[1600px] mx-auto w-full space-y-6">
       <div>
-        <h1 className="text-lg font-semibold text-text-primary flex items-center gap-2">
-          <MapIcon className="w-5 h-5 text-text-tertiary" /> Live Tracking
+        <h1 className="font-serif text-2xl font-medium tracking-tight text-text-primary flex items-center gap-2">
+          <MapIcon className="w-5 h-5 text-accent-gold" /> Live Tracking
         </h1>
-        <p className="text-xs text-text-secondary mt-0.5">Real-time positions for every vehicle currently on a trip.</p>
+        <p className="text-sm text-text-secondary mt-1">Real-time positions for every vehicle currently on a trip.</p>
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
-        <div className="bg-ops-sidebar rounded-xl p-4">
-          <p className="text-xs text-white/60 flex items-center gap-1.5">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 stagger">
+        <div className="bg-white border border-border shadow-soft rounded-2xl p-4 hover-lift">
+          <p className="eyebrow flex items-center gap-1.5">
             <Navigation className="w-3.5 h-3.5" /> Active
           </p>
-          <p className="text-2xl font-bold text-white mt-1">{activeCount}</p>
+          <p className="text-3xl font-semibold tabular-nums text-text-primary mt-2">{activeCount}</p>
         </div>
-        <div className="bg-ops-sidebar rounded-xl p-4">
-          <p className="text-xs text-white/60 flex items-center gap-1.5">
+        <div className="bg-white border border-border shadow-soft rounded-2xl p-4 hover-lift">
+          <p className="eyebrow flex items-center gap-1.5">
             <MapPin className="w-3.5 h-3.5" /> Total on map
           </p>
-          <p className="text-2xl font-bold text-white mt-1">{positions.length}</p>
+          <p className="text-3xl font-semibold tabular-nums text-text-primary mt-2">{positions.length}</p>
         </div>
-        <div className={`${sosCount > 0 ? "bg-danger" : "bg-ops-sidebar"} rounded-xl p-4`}>
-          <p className="text-xs text-white/60 flex items-center gap-1.5">
+        <div className={`${sosCount > 0 ? "bg-danger-soft border-danger/30" : "bg-white border-border"} border shadow-soft rounded-2xl p-4`}>
+          <p className="eyebrow flex items-center gap-1.5">
             <AlertCircle className="w-3.5 h-3.5" /> SOS
           </p>
-          <p className="text-2xl font-bold text-white mt-1">{sosCount}</p>
+          <p className="text-3xl font-semibold tabular-nums text-text-primary mt-2">{sosCount}</p>
         </div>
       </div>
 
       <div className="grid grid-cols-3 gap-6">
         <div className="col-span-2 space-y-4">
-          <Card padding="lg" header={<h3 className="font-semibold">Fleet Map</h3>}>
+          <Card padding="lg" header={<h3 className="font-serif text-xl font-medium">Fleet Map</h3>}>
             {isLoading ? (
-              <div className="h-80 bg-ops-bg rounded flex items-center justify-center text-text-secondary text-sm">
+              <div className="h-80 skeleton flex items-center justify-center text-text-secondary text-sm">
                 Loading positions…
               </div>
             ) : (

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import { ChevronUp, ChevronDown, ChevronsLeft, ChevronsRight } from "lucide-react";
+import { ChevronUp, ChevronDown, ChevronsLeft, ChevronsRight, Inbox } from "lucide-react";
 import { Button } from "./Button";
 
 export interface Column {
@@ -63,31 +63,41 @@ export const DataTable = React.forwardRef<HTMLDivElement, DataTableProps>(
 
     if (data.length === 0) {
       return (
-        <div ref={ref} className="text-center py-8 text-text-secondary">
-          {emptyMessage}
+        <div ref={ref} className="flex flex-col items-center gap-2 py-12 text-center text-text-secondary border border-dashed border-border rounded-2xl bg-white animate-fade-in">
+          <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-ops-card2 text-text-tertiary">
+            <Inbox className="w-5 h-5" />
+          </span>
+          <p className="text-sm font-medium">{emptyMessage}</p>
         </div>
       );
     }
 
     return (
       <div ref={ref} className="flex flex-col gap-4">
-        <div className="overflow-x-auto border border-border rounded-xl bg-white">
+        <div className="overflow-auto max-h-[70vh] border border-border rounded-2xl bg-white shadow-soft custom-scrollbar">
           <table className="w-full text-sm">
-            <thead className="bg-ops-sidebar border-b border-border">
+            <thead className="sticky top-0 z-10 bg-ops-card2 border-b border-border">
               <tr>
                 {columns.map((col) => (
                   <th
                     key={col.key}
-                    className="px-4 py-3 text-left font-medium text-white cursor-pointer hover:bg-[#162030] transition-colors"
+                    className={`px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-text-secondary transition-colors select-none ${
+                      col.sortable ? "cursor-pointer hover:text-text-primary" : ""
+                    }`}
+                    aria-sort={
+                      col.sortable && sortKey === col.key
+                        ? sortDirection === "asc" ? "ascending" : "descending"
+                        : undefined
+                    }
                     onClick={() => col.sortable && handleSort(col.key)}
                   >
                     <div className="flex items-center gap-2">
                       {col.header}
                       {col.sortable && sortKey === col.key && (
                         sortDirection === "asc" ? (
-                          <ChevronUp className="w-4 h-4" />
+                          <ChevronUp className="w-3.5 h-3.5 text-accent-gold" />
                         ) : (
-                          <ChevronDown className="w-4 h-4" />
+                          <ChevronDown className="w-3.5 h-3.5 text-accent-gold" />
                         )
                       )}
                     </div>
@@ -97,9 +107,9 @@ export const DataTable = React.forwardRef<HTMLDivElement, DataTableProps>(
             </thead>
             <tbody>
               {paginatedData.map((row, idx) => (
-                <tr key={idx} className={idx % 2 === 0 ? "bg-white" : "bg-ops-bg"}>
+                <tr key={idx} className="bg-white border-b border-ops-line last:border-b-0 hover:bg-ops-bg transition-colors">
                   {columns.map((col) => (
-                    <td key={col.key} className="px-4 py-2.5 text-text-primary font-medium">
+                    <td key={col.key} className="px-4 py-3.5 text-text-primary">
                       {col.render ? col.render(row[col.key], row) : String(row[col.key] ?? "-")}
                     </td>
                   ))}
@@ -111,7 +121,7 @@ export const DataTable = React.forwardRef<HTMLDivElement, DataTableProps>(
 
         {totalPages > 1 && (
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-            <p className="text-xs text-text-secondary">
+            <p className="text-xs text-text-secondary tabular-nums">
               Page {page + 1} of {totalPages}
             </p>
             <div className="flex gap-2">

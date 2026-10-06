@@ -35,11 +35,11 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
 
     return (
       <div className="w-full">
-        {label && <label htmlFor={selectId} className="block text-sm font-medium mb-1 text-text-primary">{label}</label>}
+        {label && <label htmlFor={selectId} className="block text-xs font-semibold mb-1.5 text-text-primary">{label}</label>}
         <select
           ref={ref}
           id={selectId}
-          className={`w-full px-3 py-2 bg-white border border-border rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-transparent ${className}`}
+          className={`w-full h-10 px-3 text-sm bg-white border border-border rounded-lg text-text-primary transition-[border-color,box-shadow] hover:border-[#C2C7CF] focus:outline-none focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue disabled:bg-ops-card2 disabled:text-text-tertiary disabled:cursor-not-allowed ${error ? "border-danger focus:border-danger focus:ring-danger/20" : ""} ${className}`}
           {...props}
         >
           {needsPlaceholder && (
@@ -53,7 +53,7 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
             </option>
           ))}
         </select>
-        {error && <p className="text-xs text-danger mt-1">{error}</p>}
+        {error && <p className="text-xs text-danger mt-1.5" role="alert">{error}</p>}
       </div>
     );
   }

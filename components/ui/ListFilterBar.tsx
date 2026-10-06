@@ -37,14 +37,14 @@ export const ListFilterBar: React.FC<ListFilterBarProps> = ({
   return (
     <div className={`flex flex-wrap items-end gap-3 ${className}`}>
       <div className="relative flex-1 min-w-0 sm:min-w-[16rem]">
-        <label className="block text-xs text-text-secondary mb-1">Search</label>
+        <label className="block text-xs font-semibold text-text-primary mb-1.5">Search</label>
         <Search className="w-4 h-4 absolute left-3 top-[2.1rem] text-text-tertiary" />
         <input
           type="text"
           value={value.search}
           onChange={(e) => set({ search: e.target.value })}
           placeholder={searchPlaceholder}
-          className="w-full pl-9 pr-9 py-2 bg-white border border-border rounded-lg text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-blue"
+          className="w-full h-10 pl-9 pr-9 bg-white border border-border rounded-lg text-sm text-text-primary placeholder:text-text-tertiary hover:border-[#C2C7CF] transition-[border-color,box-shadow] focus:outline-none focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue"
         />
         {value.search && (
           <button
@@ -59,7 +59,7 @@ export const ListFilterBar: React.FC<ListFilterBarProps> = ({
       </div>
 
       <div className="w-44">
-        <label className="block text-xs text-text-secondary mb-1">From</label>
+        <label className="block text-xs font-semibold text-text-primary mb-1.5">From</label>
         <DateTimePicker
           mode="date"
           value={value.dateFrom}
@@ -69,7 +69,7 @@ export const ListFilterBar: React.FC<ListFilterBarProps> = ({
       </div>
 
       <div className="w-44">
-        <label className="block text-xs text-text-secondary mb-1">To</label>
+        <label className="block text-xs font-semibold text-text-primary mb-1.5">To</label>
         <DateTimePicker
           mode="date"
           value={value.dateTo}

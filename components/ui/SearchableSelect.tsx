@@ -155,7 +155,7 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
             setQuery("");
           }
         }}
-        className={`w-full px-3 py-2 bg-white border border-border rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-ops-card2 pr-8`}
+        className={`w-full h-10 px-3 text-sm bg-white border border-border rounded-lg text-text-primary placeholder:text-text-tertiary transition-[border-color,box-shadow] hover:border-[#C2C7CF] focus:outline-none focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-ops-card2 pr-8`}
       />
       {/* A plain text input doesn't read as "click me, I'm a dropdown" — the chevron is the
           visual cue. Hidden behind the clear ✕ (same corner) once there's a selection to clear;
@@ -198,7 +198,7 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
               ? { top: pos.top }
               : { bottom: window.innerHeight - pos.top }),
           }}
-          className="z-[100] max-h-56 overflow-auto bg-white border border-border rounded-lg shadow-xl"
+          className="z-[100] max-h-56 overflow-auto bg-white border border-border rounded-xl shadow-lift animate-menu-in"
         >
           {filtered.length === 0 ? (
             <div className="px-3 py-2 text-sm text-text-secondary">No matches</div>

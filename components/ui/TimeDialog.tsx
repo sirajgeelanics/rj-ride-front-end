@@ -91,7 +91,7 @@ export const TimeDialog: React.FC<TimeDialogProps> = ({
       role="dialog"
       aria-modal="true"
     >
-      <div className="bg-white rounded-2xl shadow-xl w-[330px] overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-modal animate-modal-in w-[330px] overflow-hidden">
         <div className="bg-brand-blue px-6 py-5">
           <p className="text-white/70 text-[11px] font-semibold tracking-wide mb-2">{title}</p>
           <div className="flex items-center gap-2">

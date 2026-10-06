@@ -27,8 +27,8 @@ export default function TripsPage() {
   };
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex justify-between items-center gap-3">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-[1600px] mx-auto w-full space-y-6">
+      <div className="flex flex-wrap justify-between items-center gap-3">
         <FleetFilterPanel />
         <Button onClick={() => setShowCreateModal(true)} variant="primary">
           {t("newTripRequest", language)}
@@ -41,18 +41,18 @@ export default function TripsPage() {
 
       <Drawer open={showCreateModal} onClose={() => setShowCreateModal(false)} title={t("createTripRequest", language)} width="2xl">
         {!creationMethod ? (
-          <div className="flex flex-col justify-center h-full space-y-4 px-2">
+          <div className="flex flex-col justify-center h-full space-y-3 px-2 stagger">
             <p className="text-sm text-text-secondary text-center mb-2">{t("chooseCreationMethod", language)}:</p>
-            <Button onClick={() => setCreationMethod("MANUAL")} variant="primary" className="w-full justify-start py-3">
+            <Button onClick={() => setCreationMethod("MANUAL")} variant="primary" className="w-full justify-start h-12">
               {t("manualEntry", language)}
             </Button>
-            <Button onClick={() => setCreationMethod("BULK_UPLOAD")} variant="secondary" className="w-full justify-start py-3">
+            <Button onClick={() => setCreationMethod("BULK_UPLOAD")} variant="secondary" className="w-full justify-start h-12">
               {t("bulkUploadCSV", language)}
             </Button>
-            <Button onClick={() => setCreationMethod("RECURRING")} variant="secondary" className="w-full justify-start py-3">
+            <Button onClick={() => setCreationMethod("RECURRING")} variant="secondary" className="w-full justify-start h-12">
               {t("recurringGenerator", language)}
             </Button>
-            <Button onClick={() => setCreationMethod("CLONE")} variant="secondary" className="w-full justify-start py-3">
+            <Button onClick={() => setCreationMethod("CLONE")} variant="secondary" className="w-full justify-start h-12">
               {t("cloneExistingTrip", language)}
             </Button>
           </div>
@@ -60,7 +60,7 @@ export default function TripsPage() {
           <div className="h-full flex flex-col">
             <button
               onClick={() => setCreationMethod(null)}
-              className="text-sm text-brand-blue hover:text-brand-blue/80 mb-4 self-start"
+              className="text-sm font-medium text-brand-blue hover:text-brand-wine-hover mb-4 self-start rounded-md px-1 -ml-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/30"
             >
               ← {t("backToMethods", language)}
             </button>

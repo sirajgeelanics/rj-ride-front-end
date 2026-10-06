@@ -131,7 +131,8 @@ export const VendorLoginPanel: React.FC<VendorLoginPanelProps> = ({ vendorId, ve
       ) : !login ? (
         <div className="space-y-2">
           <p className="text-xs text-text-secondary">
-            This vendor has no portal login yet.
+            This vendor has no portal login yet, so it cannot sign in to the vendor portal. Create one
+            below.
             {!vendorEmail && " Set a contact email above first — the login needs one."}
           </p>
           <Input
@@ -162,6 +163,12 @@ export const VendorLoginPanel: React.FC<VendorLoginPanelProps> = ({ vendorId, ve
               {login.is_active ? "Active" : "Deactivated"}
             </span>
           </div>
+          {vendorEmail && vendorEmail.trim().toLowerCase() !== login.email.toLowerCase() && (
+            <p className="text-xs text-warning">
+              The vendor signs in with <span className="font-mono">{login.email}</span>, which differs
+              from the contact email above. Saving the vendor moves the login to the new email.
+            </p>
+          )}
           <Input
             type="password"
             value={chosenPassword}

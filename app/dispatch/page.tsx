@@ -83,17 +83,17 @@ export default function DispatchPage() {
   const alertCards = allCards.filter((card) => EXCEPTION_STATUSES.includes(card.status));
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-[1600px] mx-auto w-full space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-text-primary">Dispatch Board</h1>
+        <h1 className="font-serif text-3xl font-medium tracking-tight text-text-primary">Dispatch Board</h1>
         <p className="text-sm text-text-secondary mt-1">Real-time trip dispatch from the live API. WS events auto-refresh.</p>
       </div>
 
-      <div className="bg-gradient-to-r from-brand-blue/5 to-indigo-500/5 border border-brand-blue/20 rounded-xl p-4">
+      <div className="bg-gradient-to-r from-navy-soft to-white border border-brand-blue/15 shadow-soft rounded-2xl p-5">
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
-              <Zap className="w-4 h-4 text-brand-blue" /> Auto-Assign All
+              <Zap className="w-4 h-4 text-accent-gold" /> Auto-Assign All
             </h3>
             <p className="text-xs text-text-secondary mt-0.5">Assigns best available vehicles to all pending trips in one call.</p>
           </div>
@@ -127,27 +127,27 @@ export default function DispatchPage() {
         )}
       </div>
 
-      <div className="grid grid-cols-4 gap-4">
-        <div className="bg-ops-sidebar rounded-xl p-4">
-          <p className="text-xs text-white/60">Total Vehicles</p>
-          <p className="text-2xl font-bold text-white mt-1">{totalCards}</p>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 stagger">
+        <div className="bg-white border border-border shadow-soft rounded-2xl p-4 hover-lift">
+          <p className="eyebrow">Total Vehicles</p>
+          <p className="text-3xl font-semibold tabular-nums text-text-primary mt-2">{totalCards}</p>
         </div>
-        <div className="bg-ops-sidebar rounded-xl p-4">
-          <p className="text-xs text-white/60">Columns</p>
-          <p className="text-2xl font-bold text-white mt-1">{COLUMN_ORDER.length}</p>
+        <div className="bg-white border border-border shadow-soft rounded-2xl p-4 hover-lift">
+          <p className="eyebrow">Columns</p>
+          <p className="text-3xl font-semibold tabular-nums text-text-primary mt-2">{COLUMN_ORDER.length}</p>
         </div>
-        <div className={`${alertCards.length > 0 ? "bg-danger" : "bg-ops-sidebar"} rounded-xl p-4`}>
-          <p className="text-xs text-white/60">Alerts</p>
-          <p className="text-2xl font-bold text-white mt-1">{alertCards.length}</p>
+        <div className={`${alertCards.length > 0 ? "bg-danger-soft border-danger/30" : "bg-white border-border"} border shadow-soft rounded-2xl p-4`}>
+          <p className="eyebrow">Alerts</p>
+          <p className="text-3xl font-semibold tabular-nums text-text-primary mt-2">{alertCards.length}</p>
         </div>
-        <div className="bg-ops-sidebar rounded-xl p-4">
-          <p className="text-xs text-white/60">Pending</p>
-          <p className="text-2xl font-bold text-white mt-1">{(columns["PENDING"] ?? []).length}</p>
+        <div className="bg-white border border-border shadow-soft rounded-2xl p-4 hover-lift">
+          <p className="eyebrow">Pending</p>
+          <p className="text-3xl font-semibold tabular-nums text-text-primary mt-2">{(columns["PENDING"] ?? []).length}</p>
         </div>
       </div>
 
       {isLoading ? (
-        <div className="py-12 text-center text-sm text-text-secondary">Loading dispatch board…</div>
+        <div className="py-12 text-center text-sm text-text-secondary animate-pulse">Loading dispatch board…</div>
       ) : totalCards === 0 ? (
         <Card padding="lg" className="text-center py-8 text-text-secondary">No board data.</Card>
       ) : (

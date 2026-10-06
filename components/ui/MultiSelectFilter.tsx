@@ -116,7 +116,7 @@ export const MultiSelectFilter: React.FC<MultiSelectFilterProps> = ({
           setOpen((o) => !o);
           setQuery("");
         }}
-        className={`w-full flex items-center justify-between gap-2 px-3 py-2 bg-white border rounded-lg text-sm text-left transition-colors ${
+        className={`w-full h-10 flex items-center justify-between gap-2 px-3 bg-white border rounded-lg text-sm text-left transition-[border-color,box-shadow] hover:border-[#C2C7CF] focus:outline-none focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue ${
           selected.length > 0
             ? "border-brand-blue text-text-primary"
             : "border-border text-text-secondary"
@@ -159,7 +159,7 @@ export const MultiSelectFilter: React.FC<MultiSelectFilterProps> = ({
           <div
             ref={menuRef}
             style={{ position: "fixed", top: pos.top, left: pos.left, width: pos.width }}
-            className="z-[100] bg-white border border-border rounded-lg shadow-xl overflow-hidden"
+            className="z-[100] bg-white border border-border rounded-xl shadow-lift overflow-hidden animate-menu-in"
           >
             <div className="flex items-center gap-2 px-3 py-2 border-b border-border">
               <Search className="w-4 h-4 text-text-muted shrink-0" />

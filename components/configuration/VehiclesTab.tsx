@@ -16,10 +16,13 @@ import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { Badge } from "@/components/ui/Badge";
 import { HealthStrip } from "@/components/configuration/HealthStrip";
 import { useToastStore } from "@/stores/toastStore";
+import { splitAirportCodes } from "@/lib/airportCodes";
 
 type ApiVehicle = components["schemas"]["Vehicle"];
 type PatchedVehicle = components["schemas"]["PatchedVehicle"];
-type ApiVendor = components["schemas"]["Vendor"];
+// airport_code is served by the API but missing from the generated Vendor schema (stale since the
+// city -> airport_code rename).
+type ApiVendor = components["schemas"]["Vendor"] & { airport_code?: string | null };
 type ApiVehicleType = components["schemas"]["VehicleType"];
 type ApiVehicleName = components["schemas"]["VehicleName"];
 
@@ -32,6 +35,8 @@ interface VehicleWriteInput {
   vehicle_name?: string;
   plate: string;
   traccar_device_id?: string;
+  // Only meaningful (and only shown) when the vendor operates at more than one airport.
+  airport_code?: string;
   is_active?: boolean;
 }
 
@@ -184,7 +189,7 @@ export const VehiclesTab: React.FC<VehiclesTabProps> = ({ searchQuery = "" }) =>
   // Deactivation asks for confirmation first (it removes the vehicle from the fleet).
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; label: string } | null>(null);
 
-  const emptyForm: VehicleWriteInput = { vendor: "", vehicle_type: "", vehicle_name: "", plate: "", traccar_device_id: "", is_active: true };
+  const emptyForm: VehicleWriteInput = { vendor: "", vehicle_type: "", vehicle_name: "", plate: "", traccar_device_id: "", airport_code: "", is_active: true };
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState<VehicleWriteInput>(emptyForm);
@@ -203,14 +208,24 @@ export const VehiclesTab: React.FC<VehiclesTabProps> = ({ searchQuery = "" }) =>
       vehicle_name: vehicle.vehicle_name ?? "",
       plate: vehicle.plate,
       traccar_device_id: vehicle.traccar_device_id ?? "",
+      airport_code: vehicle.airport_code ?? "",
       is_active: vehicle.is_active,
     });
     setDrawerOpen(true);
   };
 
+  const selectedVendor = vendors.find((v) => v.id === formData.vendor);
+  const vendorAirportCodes = splitAirportCodes(selectedVendor?.airport_code);
+  const showAirport = vendorAirportCodes.length > 1;
+  const airportOptions = vendorAirportCodes.map((c) => ({ value: c, label: c }));
+
   const handleSave = () => {
     if (!formData.vendor || !formData.vehicle_type || !formData.plate.trim()) {
       addToast("Vendor, vehicle type and registration are required", "error");
+      return;
+    }
+    if (showAirport && !formData.airport_code) {
+      addToast("Select the airport this vehicle operates from", "error");
       return;
     }
     const input: VehicleWriteInput = {
@@ -219,6 +234,7 @@ export const VehiclesTab: React.FC<VehiclesTabProps> = ({ searchQuery = "" }) =>
       vehicle_name: formData.vehicle_name || undefined,
       plate: formData.plate.trim(),
       traccar_device_id: formData.traccar_device_id?.trim() || undefined,
+      airport_code: showAirport ? formData.airport_code : "",
       is_active: formData.is_active,
     };
     if (editingId) {
@@ -272,6 +288,15 @@ export const VehiclesTab: React.FC<VehiclesTabProps> = ({ searchQuery = "" }) =>
       render: (val): React.ReactNode => (val as string) || t("dash", language),
     },
     {
+      key: "airport_code",
+      header: "Airport",
+      render: (val, row): React.ReactNode => {
+        if (val) return val as string;
+        const owner = vendors.find((v) => v.id === (row as Record<string, unknown>).vendor);
+        return splitAirportCodes(owner?.airport_code).join(", ") || t("dash", language);
+      },
+    },
+    {
       key: "is_active",
       header: t("status", language),
       // `status` isn't in the generated schema yet — hand-typed to match
@@ -318,9 +343,11 @@ export const VehiclesTab: React.FC<VehiclesTabProps> = ({ searchQuery = "" }) =>
         <h3 className="font-semibold text-ops-sidebar">
           {t("vehicles", language)} ({vehicles.length})
         </h3>
-        <Button onClick={openCreate} variant="primary" size="sm">
-          New Vehicle
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button onClick={openCreate} variant="primary" size="sm">
+            New Vehicle
+          </Button>
+        </div>
       </div>
 
       <HealthStrip expiredCount={0} expiringCount={0} />
@@ -369,10 +396,24 @@ export const VehiclesTab: React.FC<VehiclesTabProps> = ({ searchQuery = "" }) =>
             <SearchableSelect
               options={vendorOptions.filter((o) => o.value)}
               value={formData.vendor}
-              onChange={(val) => setFormData({ ...formData, vendor: val })}
+              onChange={(val) => setFormData({ ...formData, vendor: val, airport_code: "" })}
               placeholder="Search vendor…"
             />
           </FormField>
+
+          {showAirport && (
+            <FormField label="Airport" required>
+              <SearchableSelect
+                options={airportOptions}
+                value={formData.airport_code ?? ""}
+                onChange={(val) => setFormData({ ...formData, airport_code: val })}
+                placeholder="Select airport…"
+              />
+              <p className="text-xs text-text-secondary mt-1">
+                This vendor operates at several airports — pick where this vehicle works from.
+              </p>
+            </FormField>
+          )}
 
           <FormField label="Vehicle Type" required>
             <SearchableSelect

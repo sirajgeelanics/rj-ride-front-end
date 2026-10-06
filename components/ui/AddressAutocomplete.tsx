@@ -169,7 +169,7 @@ export const AddressAutocomplete: React.FC<AddressAutocompleteProps> = ({
               setOpen(false);
             }
           }}
-          className={`w-full pl-10 ${hasCoordinates ? "pr-8" : "pr-3"} py-2 bg-white border border-border rounded-lg text-text-primary placeholder-text-secondary focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-transparent`}
+          className={`w-full pl-10 ${hasCoordinates ? "pr-8" : "pr-3"} h-10 text-sm bg-white border border-border rounded-lg text-text-primary placeholder-text-secondary focus:outline-none focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue`}
         />
         {hasCoordinates && (
           <span

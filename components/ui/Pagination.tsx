@@ -30,12 +30,12 @@ export const Pagination: React.FC<PaginationProps> = ({
   if (!page.hasPrev && !page.hasNext) return null;
 
   return (
-    <div className={`flex items-center justify-between pt-3 ${className}`}>
+    <div className={`flex items-center justify-between gap-3 pt-4 ${className}`}>
       <Button size="sm" variant="secondary" onClick={page.goPrev} disabled={!page.hasPrev}>
         <ChevronLeft className="w-4 h-4 mr-1" /> Prev
       </Button>
 
-      <span className="text-xs text-text-secondary">
+      <span className="text-xs font-medium text-text-secondary tabular-nums rounded-full bg-ops-card2 px-3 py-1">
         Page {page.pageIndex + 1}
         {typeof count === "number" && (
           <>

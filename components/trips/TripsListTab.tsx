@@ -148,11 +148,11 @@ export const TripsListTab: React.FC = () => {
     <div className="space-y-4">
       <div className="flex flex-wrap gap-3 items-end">
         <div>
-          <label className="block text-xs font-medium text-text-secondary mb-1">Status</label>
+          <label className="block text-xs font-semibold text-text-primary mb-1.5">Status</label>
           <select
             value={statusFilter}
             onChange={(e) => { setStatusFilter(e.target.value); resetPagination(); }}
-            className="px-3 py-2 bg-white border border-border rounded-lg text-sm text-text-primary cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand-blue"
+            className="px-3 h-10 bg-white border border-border rounded-lg text-sm text-text-primary hover:border-[#C2C7CF] transition-[border-color,box-shadow] cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue"
           >
             {STATUS_FILTERS.map((s) => (
               <option key={s} value={s}>{s || "All statuses"}</option>
@@ -160,11 +160,11 @@ export const TripsListTab: React.FC = () => {
           </select>
         </div>
         <div>
-          <label className="block text-xs font-medium text-text-secondary mb-1">Date from</label>
+          <label className="block text-xs font-semibold text-text-primary mb-1.5">Date from</label>
           <DateTimePicker mode="date" value={dateFrom} onChange={(val) => { setDateFrom(val); resetPagination(); }} />
         </div>
         <div>
-          <label className="block text-xs font-medium text-text-secondary mb-1">Date to</label>
+          <label className="block text-xs font-semibold text-text-primary mb-1.5">Date to</label>
           <DateTimePicker mode="date" value={dateTo} onChange={(val) => { setDateTo(val); resetPagination(); }} />
         </div>
         {!isLoading && trips.length > 0 && (
@@ -177,7 +177,7 @@ export const TripsListTab: React.FC = () => {
       {isLoading ? (
         <div className="space-y-2">
           {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="h-[70px] rounded-lg border border-border bg-white animate-pulse" />
+            <div key={i} className="h-[70px] rounded-xl border border-border skeleton" />
           ))}
         </div>
       ) : trips.length === 0 ? (
@@ -197,7 +197,7 @@ export const TripsListTab: React.FC = () => {
                 tabIndex={0}
                 onClick={() => setSelectedTripId(trip.id)}
                 onKeyDown={(e) => e.key === "Enter" && setSelectedTripId(trip.id)}
-                className="group flex items-center gap-4 rounded-lg border border-border bg-white px-4 py-3.5 cursor-pointer transition-all hover:border-brand-blue/40 hover:shadow-md hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-brand-blue/30"
+                className="group flex items-center gap-4 rounded-xl border border-border bg-white px-4 py-3.5 cursor-pointer shadow-soft transition-all hover:border-brand-blue/30 hover:shadow-lift hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/30"
               >
                 <StatusBadge status={trip.status as TripStatus} />
 

@@ -27,14 +27,14 @@ export const FormField: React.FC<FormFieldProps> = ({ label, error, hint, requir
   return (
     <div className="w-full">
       {label && (
-        <label htmlFor={fieldId} className={`block text-sm font-medium mb-1 ${labelColor}`}>
+        <label htmlFor={fieldId} className={`block text-xs font-semibold mb-1.5 ${labelColor}`}>
           {label}
-          {required && <span className="text-red-500 ml-1">*</span>}
+          {required && <span className="text-danger ml-0.5">*</span>}
         </label>
       )}
       {childrenWithId}
-      {hint && <p className={`text-xs ${hintColor}`}>{hint}</p>}
-      {error && <p className={`text-xs ${errorColor} mt-1`}>{error}</p>}
+      {hint && <p className={`text-xs mt-1.5 ${hintColor}`}>{hint}</p>}
+      {error && <p className={`text-xs ${errorColor} mt-1.5`} role="alert">{error}</p>}
     </div>
   );
 };

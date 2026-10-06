@@ -47,30 +47,35 @@ export const Modal: React.FC<ModalProps> = ({ open, onClose, title, children, si
   // sites individually.)
   return (
     <div
+      role="dialog"
+      aria-modal="true"
+      aria-hidden={!open}
+      aria-label={title}
       // Frosted backdrop, matching Drawer. `bg-[#072D62] bg-opacity-50` read as a flat blackout and
       // is Tailwind v3 syntax besides; the slash-opacity + backdrop-blur keeps the page legible
       // behind the dialog. z-[60] is explicit so it doesn't rely on a non-default `z-60` class.
-      className={`fixed inset-0 bg-[#072D62]/40 backdrop-blur-sm flex items-center justify-center z-[60] transition-opacity duration-200 ${
+      className={`fixed inset-0 bg-[#04204A]/45 backdrop-blur-sm flex items-center justify-center z-[60] transition-opacity duration-200 ${
         open ? "opacity-100" : "opacity-0 pointer-events-none"
       }`}
       onClick={onClose}
     >
       <div
-        className={`${sizeMap[size]} bg-white rounded-xl border border-border shadow-xl flex flex-col max-h-[90vh] overflow-hidden transition-transform duration-200 ${
-          open ? "scale-100" : "scale-95"
+        className={`${sizeMap[size]} bg-white rounded-2xl border border-border shadow-modal flex flex-col max-h-[90vh] overflow-hidden transition-[transform,opacity] duration-300 ease-[var(--ease-spring)] ${
+          open ? "scale-100 opacity-100 translate-y-0" : "scale-95 opacity-0 translate-y-2"
         }`}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between p-4 border-b border-border bg-ops-sidebar">
-          <h2 className="text-lg font-semibold text-white">{title}</h2>
+        <div className="flex items-center justify-between gap-3 px-6 py-4 border-b border-ops-line bg-white">
+          <h2 className="font-serif text-2xl font-medium tracking-tight text-text-primary">{title}</h2>
           <button
             onClick={onClose}
-            className="p-1 hover:bg-white hover:bg-opacity-20 rounded transition-colors"
+            aria-label="Close"
+            className="p-1.5 -mr-1.5 rounded-lg text-text-tertiary hover:text-text-primary hover:bg-ops-card2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/30"
           >
-            <X className="w-5 h-5 text-white" />
+            <X className="w-5 h-5" />
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto p-4 text-text-primary">
+        <div className="flex-1 overflow-y-auto px-6 py-5 text-text-primary">
           {children}
         </div>
       </div>

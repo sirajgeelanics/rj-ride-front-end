@@ -10,6 +10,7 @@ import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { FormField } from "@/components/ui/FormField";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
+import { vendorServesAirport } from "@/lib/airportCodes";
 
 // Same stale-schema workaround as VehicleAssignmentModal.tsx — Vendor.airport_code isn't in the
 // generated type yet.
@@ -68,12 +69,11 @@ export const RitmoManualAllotModal: React.FC<RitmoManualAllotModalProps> = ({
     return m;
   }, [allVendors]);
 
-  // Vendors operating at this airport (case-insensitive — Vendor.airport_code is free-text).
+  // Vendors operating at this airport (case-insensitive; Vendor.airport_code is a comma-separated list).
   const vendorIdsAtAirport = useMemo(() => {
     if (!airportCode) return null;
-    const code = airportCode.toLowerCase();
     return new Set(
-      allVendors.filter((v) => (v.airport_code ?? "").toLowerCase() === code).map((v) => v.id)
+      allVendors.filter((v) => vendorServesAirport(v.airport_code, airportCode)).map((v) => v.id)
     );
   }, [allVendors, airportCode]);
 
@@ -81,10 +81,16 @@ export const RitmoManualAllotModal: React.FC<RitmoManualAllotModalProps> = ({
   // vehicle type (any type is fine as long as it seats everyone; the backend's own capacity
   // check on assign_vehicle is what actually gates it, same as VehicleAssignmentModal).
   const candidateVehicles = useMemo(() => {
+    const wanted = (airportCode ?? "").trim().toUpperCase();
     return vehicles.filter(
-      (v) => v.is_active && (!vendorIdsAtAirport || vendorIdsAtAirport.has(v.vendor))
+      (v) =>
+        v.is_active &&
+        (!vendorIdsAtAirport || vendorIdsAtAirport.has(v.vendor)) &&
+        // A vehicle pinned to one of a multi-airport vendor's airports only counts there; one
+        // pinned to none counts at every airport its vendor lists.
+        (!wanted || !v.airport_code || v.airport_code.toUpperCase() === wanted)
     );
-  }, [vehicles, vendorIdsAtAirport]);
+  }, [vehicles, vendorIdsAtAirport, airportCode]);
 
   // Filter option lists are both derived from the full candidate pool (not from each other's
   // current selection), so picking one never hides options for the other.

@@ -28,16 +28,16 @@ export default function ConfigurationPage() {
   const [searchQuery, setSearchQuery] = useState("");
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-[1600px] mx-auto w-full space-y-6">
 
       <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-text-secondary" />
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-text-tertiary" />
         <input
           type="text"
           placeholder="Search by vendor, customer, vehicle type..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full pl-10 pr-9 py-2 bg-white border border-border rounded-lg text-sm text-text-primary placeholder-text-secondary focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-transparent"
+          className="w-full h-10 pl-10 pr-9 bg-white border border-border rounded-lg text-sm text-text-primary placeholder:text-text-tertiary shadow-soft hover:border-[#C2C7CF] transition-[border-color,box-shadow] focus:outline-none focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue"
         />
         {searchQuery && (
           <button

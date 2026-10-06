@@ -436,6 +436,12 @@ export default function RitmoPage() {
         addToast("No vendor has this car type free right now — try another type below.", "error");
       } else if (outcome === "no_city_vendor") {
         addToast("No vendors operate at this airport.", "error");
+      } else if (outcome === "type_not_in_fleet") {
+        addToast("This car type is not in the fleet — allot a vehicle manually instead.", "error");
+      } else if (outcome === "not_pending") {
+        addToast("This request was already handled, so nothing was sent to RITMO. Use Send to RITMO to resend its status.", "error");
+      } else {
+        addToast(`Accept did not complete (${outcome ?? "no result"}); nothing was sent to RITMO.`, "error");
       }
       void qc.invalidateQueries({ queryKey: ["ritmo", "requests"] });
     } catch (err) {
@@ -589,11 +595,11 @@ export default function RitmoPage() {
   const pendingCount = trips.filter((t) => !isFullyAccepted(t)).length;
 
   return (
-    <div className="pt-6 space-y-4">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-[1600px] mx-auto w-full space-y-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
-          <h1 className="text-lg font-semibold text-text-primary">Automated Trips</h1>
-          <p className="text-xs text-text-secondary mt-0.5">
+          <h1 className="font-serif text-2xl font-medium tracking-tight text-text-primary">Automated Trips</h1>
+          <p className="text-sm text-text-secondary mt-1">
             Bookings pushed in from RITMO — accept, allot, or cancel them here.
             {!isLoading && trips.length > 0 && (
               <span className="ml-2 px-2 py-0.5 rounded-full bg-ops-card2 tabular-nums">
@@ -660,7 +666,7 @@ export default function RitmoPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search requests — reference, RITMO ref, passenger, car type, vendor, pickup or drop…"
-            className="w-full pl-9 pr-9 py-2 bg-white border border-border rounded-lg text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-blue"
+            className="w-full pl-9 pr-9 h-10 bg-white border border-border rounded-lg text-sm text-text-primary hover:border-[#C2C7CF] transition-[border-color,box-shadow] focus:outline-none focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue"
           />
           {search && (
             <button

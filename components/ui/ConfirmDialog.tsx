@@ -39,18 +39,22 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   <Modal open={open} onClose={onCancel} title={title} size="sm">
     <div className="space-y-5">
       <div className="flex items-start gap-3">
-        {destructive && <AlertTriangle className="w-5 h-5 text-danger shrink-0 mt-0.5" />}
-        <p className="text-sm text-text-primary">{message}</p>
+        {destructive && (
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-danger-soft">
+            <AlertTriangle className="w-4.5 h-4.5 text-danger" />
+          </span>
+        )}
+        <p className="text-sm leading-relaxed text-text-secondary pt-1.5">{message}</p>
       </div>
-      <div className="flex justify-end gap-2">
-        <Button variant="secondary" size="sm" onClick={onCancel} disabled={busy}>
+      <div className="flex justify-end gap-2 pt-1">
+        <Button variant="secondary" size="md" onClick={onCancel} disabled={busy}>
           {cancelLabel}
         </Button>
         <Button
           variant={destructive ? "danger" : "primary"}
-          size="sm"
+          size="md"
           onClick={onConfirm}
-          disabled={busy}
+          loading={busy}
         >
           {busy ? "Working…" : confirmLabel}
         </Button>

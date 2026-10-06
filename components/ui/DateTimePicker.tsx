@@ -188,7 +188,7 @@ export const DateTimePicker: React.FC<DateTimePickerProps> = ({
         type="button"
         disabled={disabled}
         onClick={open}
-        className={`w-full flex items-center gap-2 px-3 py-2 bg-white border border-border rounded-lg text-sm text-left focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed ${
+        className={`w-full h-10 flex items-center gap-2 px-3 bg-white border border-border rounded-lg text-sm text-left transition-[border-color,box-shadow] hover:border-[#C2C7CF] focus:outline-none focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue disabled:opacity-50 disabled:cursor-not-allowed ${
           text ? "text-text-primary" : "text-text-tertiary"
         }`}
       >

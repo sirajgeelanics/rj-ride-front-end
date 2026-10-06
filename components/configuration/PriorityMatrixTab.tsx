@@ -9,6 +9,7 @@ import { useToastStore } from "@/stores/toastStore";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
+import { splitAirportCodes, vendorServesAirport } from "@/lib/airportCodes";
 import { ArrowUp, ArrowDown, X, Plus, ListOrdered } from "lucide-react";
 
 // dispatch_priority isn't in the generated schema yet (a new backend addition), and
@@ -54,15 +55,14 @@ export const PriorityMatrixTab: React.FC = () => {
   const airportCodes = useMemo(() => {
     const set = new Set<string>();
     for (const v of vendors) {
-      if (v.airport_code) set.add(v.airport_code);
+      for (const code of splitAirportCodes(v.airport_code)) set.add(code);
     }
     return [...set].sort();
   }, [vendors]);
 
   const vendorsAtAirport = useMemo(() => {
     if (!airportCode) return [];
-    const code = airportCode.toLowerCase();
-    return vendors.filter((v) => (v.airport_code ?? "").toLowerCase() === code);
+    return vendors.filter((v) => vendorServesAirport(v.airport_code, airportCode));
   }, [vendors, airportCode]);
 
   // The server's own current ranking for this airport — P1 first, then unranked (by

@@ -22,23 +22,25 @@ export default function APIConsolePage() {
   const [activeTab, setActiveTab] = useState("docs");
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-[1600px] mx-auto w-full space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-text-primary">{t("partnerAPIConsole", language)}</h1>
+        <h1 className="font-serif text-3xl font-medium tracking-tight text-text-primary">{t("partnerAPIConsole", language)}</h1>
         <p className="text-sm text-text-secondary mt-1">{t("integrateWithRIDE", language)}</p>
       </div>
 
-      <div className="flex gap-1 border-b border-border pb-px">
+      <div role="tablist" className="flex gap-1 border-b border-border overflow-x-auto custom-scrollbar">
         {API_TABS.map((tab) => {
           const Icon = tab.icon;
           return (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`px-4 py-2.5 text-sm font-medium transition-all flex items-center gap-2 rounded-t-lg ${
+              role="tab"
+              aria-selected={activeTab === tab.id}
+              className={`px-4 py-3 -mb-px text-sm font-medium whitespace-nowrap transition-all flex items-center gap-2 rounded-t-lg border-b-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/30 ${
                 activeTab === tab.id
-                  ? "bg-ops-sidebar text-white shadow-sm"
-                  : "text-text-secondary hover:text-text-primary hover:bg-ops-bg"
+                  ? "text-text-primary border-accent-gold"
+                  : "text-text-secondary border-transparent hover:text-text-primary hover:border-border"
               }`}
             >
               <Icon className="w-4 h-4" />
