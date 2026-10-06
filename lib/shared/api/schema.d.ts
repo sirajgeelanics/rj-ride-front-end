@@ -2428,6 +2428,7 @@ export interface components {
             readonly name: string;
             readonly phone: string;
             readonly licence_number: string;
+            readonly airport_code: string;
             readonly status: components["schemas"]["DriverStatusEnum"];
             readonly is_active: boolean;
             /** Format: uuid */
@@ -3255,6 +3256,7 @@ export interface components {
             readonly vehicle_name_display: string | null;
             readonly plate: string;
             readonly traccar_device_id: string | null;
+            readonly airport_code: string;
             readonly is_active: boolean;
             /** Format: date-time */
             readonly created_at: string;

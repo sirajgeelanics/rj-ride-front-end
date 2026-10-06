@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { Button } from "@/components/ui/Button";
 import { AlertTriangle, RefreshCw } from "lucide-react";
 
 interface ErrorBoundaryProps {
@@ -37,19 +38,16 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
 
       return (
         <div className="flex flex-col items-center justify-center py-16 px-6">
-          <div className="w-14 h-14 rounded-full bg-danger/10 flex items-center justify-center mb-4">
+          <div className="w-14 h-14 rounded-2xl bg-danger/10 ring-4 ring-danger/5 flex items-center justify-center mb-4">
             <AlertTriangle className="w-7 h-7 text-danger" />
           </div>
-          <h3 className="text-lg font-semibold text-text-primary mb-2">Something went wrong</h3>
+          <h3 className="font-serif text-xl font-medium text-text-primary mb-2">Something went wrong</h3>
           <p className="text-sm text-text-muted text-center max-w-md mb-6">
             {this.state.error?.message || "An unexpected error occurred while rendering this section."}
           </p>
-          <button
-            onClick={this.handleRetry}
-            className="flex items-center gap-2 px-4 py-2 bg-brand-blue text-white rounded-lg text-sm font-medium hover:bg-brand-blue/90 transition-colors"
-          >
+          <Button onClick={this.handleRetry}>
             <RefreshCw className="w-4 h-4" /> Retry
-          </button>
+          </Button>
         </div>
       );
     }

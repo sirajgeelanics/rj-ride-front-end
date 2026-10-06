@@ -6,6 +6,7 @@ import { apiClient, csrfFetch, isApiError, formatMoney, uuidv4 } from "@/lib/sha
 import type { components } from "@/lib/shared/api/schema.d";
 import { useToast } from "@/components/ui/Toast";
 import { StatusBadge } from "@/components/ui/StatusBadge";
+import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { Inbox, RefreshCw, CheckCircle, Car, MapPin, User, Phone, Search } from "lucide-react";
@@ -212,85 +213,81 @@ export default function OffersPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm text-slate-500 mt-0.5">
+          <p className="text-sm text-text-muted mt-0.5">
             Trips offered to you. Accept before the timer runs out by assigning a vehicle and driver —
             otherwise the offer expires and returns to the agency.
           </p>
         </div>
-        <button
-          onClick={() => void refetch()}
-          disabled={isFetching}
-          className="inline-flex items-center gap-1 px-3 py-1.5 text-sm border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50 disabled:opacity-50"
-        >
+        <Button variant="secondary" size="sm" onClick={() => void refetch()} disabled={isFetching}>
           <RefreshCw className={`w-4 h-4 ${isFetching ? "animate-spin" : ""}`} /> Refresh
-        </button>
+        </Button>
       </div>
 
       {offers.length > 0 && (
         <div className="relative">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search offers — reference, car type, passenger, pickup or drop…"
-            className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="input-field pl-9"
           />
         </div>
       )}
 
       {isLoading ? (
-        <div className="py-10 text-center text-sm text-slate-500">Loading offers…</div>
+        <div className="space-y-2" aria-busy="true"><div className="h-20 skeleton" /><div className="h-20 skeleton" style={{ animationDelay: "90ms" }} /></div>
       ) : offers.length === 0 ? (
-        <div className="py-12 text-center text-slate-500 border border-dashed border-slate-300 rounded-lg">
+        <div className="py-12 text-center text-text-muted border border-dashed border-border rounded-2xl bg-card-bg/50">
           <Inbox className="w-8 h-8 mx-auto mb-2 opacity-40" />
           <p>No active offers right now.</p>
         </div>
       ) : visibleOffers.length === 0 ? (
-        <div className="py-10 text-center text-slate-500 border border-dashed border-slate-300 rounded-lg">
+        <div className="py-10 text-center text-text-muted border border-dashed border-border rounded-2xl bg-card-bg/50">
           <p>
             No offers match <span className="font-medium">“{search}”</span>.
           </p>
         </div>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-3 stagger">
           {visibleOffers.map((offer) => {
             const expired = new Date(offer.expires_at).getTime() - now <= 0;
             return (
               <div
                 key={offer.id}
-                className="p-3 rounded-lg border border-slate-200 bg-white flex items-center justify-between gap-3 flex-wrap"
+                className="p-4 rounded-2xl border border-card-border bg-card-bg card-soft hover-lift flex items-center justify-between gap-3 flex-wrap"
               >
                 <div className="flex items-center gap-3">
                   <StatusBadge status={offer.status} />
                   <div>
                     <div className="flex items-center gap-2 flex-wrap">
-                      <p className="font-mono text-sm text-slate-800">{offer.reference}</p>
+                      <p className="font-mono text-sm text-text-primary">{offer.reference}</p>
                       <span
-                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 text-xs font-semibold"
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-indigo-100 text-accent-gold text-xs font-semibold"
                         title="Car type requested — assign a matching vehicle"
                       >
                         <Car className="w-3.5 h-3.5" />
                         {offer.vehicle_type}
                       </span>
                     </div>
-                    <p className="text-xs text-slate-500 mt-0.5">
+                    <p className="text-xs text-text-muted mt-0.5">
                       {offer.pickup_at ? new Date(offer.pickup_at).toLocaleString() : "—"} · Round{" "}
                       {offer.round}
                     </p>
 
                     <div className="mt-1.5 space-y-0.5">
-                      <div className="flex items-start gap-1.5 text-sm text-slate-700">
-                        <MapPin className="w-3.5 h-3.5 mt-0.5 shrink-0 text-slate-400" />
+                      <div className="flex items-start gap-1.5 text-sm text-text-primary">
+                        <MapPin className="w-3.5 h-3.5 mt-0.5 shrink-0 text-text-muted" />
                         <span>
                           {offer.pickup ?? "—"}
-                          <span className="mx-1.5 text-slate-400">→</span>
+                          <span className="mx-1.5 text-text-muted">→</span>
                           {offer.drop ?? "—"}
                         </span>
                       </div>
                       {offer.passenger_name && (
-                        <div className="flex items-center gap-1.5 text-xs text-slate-600">
-                          <User className="w-3.5 h-3.5 shrink-0 text-slate-400" />
+                        <div className="flex items-center gap-1.5 text-xs text-text-secondary">
+                          <User className="w-3.5 h-3.5 shrink-0 text-text-muted" />
                           <span>{offer.passenger_name}</span>
                           {offer.passenger_phone && (
                             <a
@@ -302,12 +299,12 @@ export default function OffersPage() {
                             </a>
                           )}
                           {offer.pax_count > 1 && (
-                            <span className="text-slate-400">· {offer.pax_count} pax</span>
+                            <span className="text-text-muted">· {offer.pax_count} pax</span>
                           )}
                         </div>
                       )}
                       {offer.locked_price_minor != null && (
-                        <p className="text-sm font-semibold text-slate-800">
+                        <p className="text-sm font-semibold text-text-primary">
                           {formatMoney(offer.locked_price_minor, offer.currency ?? "USD")}
                         </p>
                       )}
@@ -326,13 +323,9 @@ export default function OffersPage() {
                   >
                     {expired ? "expired" : `expires in ${countdown(offer.expires_at, now)}`}
                   </span>
-                  <button
-                    onClick={() => openAccept(offer)}
-                    disabled={expired}
-                    className="inline-flex items-center gap-1 px-3 py-1.5 text-sm rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
-                  >
+                  <Button size="sm" onClick={() => openAccept(offer)} disabled={expired}>
                     <CheckCircle className="w-4 h-4" /> Accept
-                  </button>
+                  </Button>
                 </div>
               </div>
             );
@@ -343,19 +336,19 @@ export default function OffersPage() {
       <Modal open={!!accepting} onClose={() => setAccepting(null)} title="Accept offer">
         {accepting && (
           <div className="space-y-4">
-            <p className="text-sm text-slate-600">
+            <p className="text-sm text-text-secondary">
               Assign a vehicle and driver to accept trip{" "}
               <span className="font-mono font-medium">{accepting.reference}</span>.
             </p>
-            <div className="flex items-center gap-2 p-2.5 rounded-lg bg-indigo-50 border border-indigo-100">
-              <Car className="w-4 h-4 text-indigo-700 shrink-0" />
-              <span className="text-sm text-indigo-900">
+            <div className="flex items-center gap-2 p-2.5 rounded-xl bg-table-header border border-card-border">
+              <Car className="w-4 h-4 text-accent-gold shrink-0" />
+              <span className="text-sm text-text-primary">
                 Car type requested: <strong>{accepting.vehicle_type}</strong>
               </span>
             </div>
             <div>
-              <label className="block text-xs text-slate-500 mb-1">
-                Vehicle <span className="text-slate-400">({vehicleOptions.length})</span>
+              <label className="field-label">
+                Vehicle <span className="text-text-muted">({vehicleOptions.length})</span>
               </label>
               <SearchableSelect
                 value={vehicleId}
@@ -365,8 +358,8 @@ export default function OffersPage() {
               />
             </div>
             <div>
-              <label className="block text-xs text-slate-500 mb-1">
-                Driver <span className="text-slate-400">({driverOptions.length})</span>
+              <label className="field-label">
+                Driver <span className="text-text-muted">({driverOptions.length})</span>
               </label>
               <SearchableSelect
                 value={driverId}
@@ -376,19 +369,17 @@ export default function OffersPage() {
               />
             </div>
             <div className="flex gap-2 pt-1">
-              <button
+              <Button
+                className="flex-1"
                 onClick={() => void submitAccept()}
-                disabled={submitting || !vehicleId || !driverId}
-                className="flex-1 px-3 py-2 text-sm rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+                disabled={!vehicleId || !driverId}
+                loading={submitting}
               >
                 {submitting ? "Accepting…" : "Confirm & Accept"}
-              </button>
-              <button
-                onClick={() => setAccepting(null)}
-                className="flex-1 px-3 py-2 text-sm rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50"
-              >
+              </Button>
+              <Button variant="secondary" className="flex-1" onClick={() => setAccepting(null)}>
                 Cancel
-              </button>
+              </Button>
             </div>
           </div>
         )}

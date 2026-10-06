@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@/components/ui/Button";
 import React, { useState, useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient, keys, isApiError, useLanguageStore, t, formatMoney } from "@/lib/shared";
@@ -365,7 +366,7 @@ export default function TripsPage() {
         </p>
       </div>
 
-      <div className="bg-card-bg border border-card-border rounded-xl p-4">
+      <div className="bg-card-bg border border-card-border rounded-2xl card-soft p-4">
         <div className="flex items-center gap-3 flex-wrap">
           <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
@@ -374,14 +375,14 @@ export default function TripsPage() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={t("searchTripIdOrRoute", language)}
-              className="w-full pl-9 pr-3 py-2 bg-page-bg border border-border rounded-lg text-sm text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-brand-blue/30"
+              className="input-field pl-9"
             />
           </div>
 
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-2 bg-page-bg border border-border rounded-lg text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-blue/30"
+            className="input-field w-auto"
           >
             {statusOptions.map((opt) => (
               <option key={opt} value={opt}>
@@ -665,7 +666,7 @@ export default function TripsPage() {
             </p>
 
             <div>
-              <label className="block text-sm font-medium text-text-primary mb-2">
+              <label className="field-label">
                 Vehicle <span className="text-danger">*</span>
               </label>
               <SearchableSelect
@@ -677,7 +678,7 @@ export default function TripsPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-text-primary mb-2">
+              <label className="field-label">
                 Driver <span className="text-danger">*</span>
               </label>
               <SearchableSelect
@@ -690,20 +691,22 @@ export default function TripsPage() {
 
             {showReassignModal.mode !== "allot" && (
               <div>
-                <label className="block text-sm font-medium text-text-primary mb-2">Reason <span className="text-danger">*</span></label>
+                <label className="field-label">Reason <span className="text-danger">*</span></label>
                 <input
                   type="text"
                   value={reassignReason}
                   onChange={(e) => setReassignReason(e.target.value)}
                   placeholder="e.g. Vehicle breakdown, driver unavailable…"
-                  className="w-full px-3 py-2 bg-page-bg border border-border rounded-lg text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-blue/30"
+                  className="w-full input-field w-auto"
                 />
               </div>
             )}
 
             <div className="flex gap-3 pt-2">
               {showReassignModal.mode === "allot" ? (
-                <button
+                <Button
+                  className="flex-1 !bg-none bg-success hover:bg-success/90"
+                  loading={allotMutation.isPending}
                   onClick={() => {
                     if (!showReassignModal || !reassignVehicleId || !reassignDriverId) return;
                     allotMutation.mutate({
@@ -713,13 +716,14 @@ export default function TripsPage() {
                       driverId: reassignDriverId,
                     });
                   }}
-                  disabled={!reassignVehicleId || !reassignDriverId || allotMutation.isPending}
-                  className="flex-1 px-4 py-2.5 bg-success text-white rounded-lg font-medium text-sm hover:bg-success/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  disabled={!reassignVehicleId || !reassignDriverId}
                 >
                   {allotMutation.isPending ? "Allotting…" : "Accept & Allot"}
-                </button>
+                </Button>
               ) : (
-                <button
+                <Button
+                  className="flex-1"
+                  loading={assignMutation.isPending}
                   onClick={() => {
                     if (!showReassignModal || !reassignVehicleId || !reassignDriverId || !reassignReason.trim()) return;
                     assignMutation.mutate({
@@ -730,18 +734,17 @@ export default function TripsPage() {
                       reason: reassignReason,
                     });
                   }}
-                  disabled={!reassignVehicleId || !reassignDriverId || !reassignReason.trim() || assignMutation.isPending}
-                  className="flex-1 px-4 py-2.5 bg-brand-blue text-white rounded-lg font-medium text-sm hover:bg-brand-blue/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  disabled={!reassignVehicleId || !reassignDriverId || !reassignReason.trim()}
                 >
                   {assignMutation.isPending ? "Reassigning…" : "Confirm Reassign"}
-                </button>
+                </Button>
               )}
-              <button
+              <Button
+                variant="secondary"
                 onClick={() => { setShowReassignModal(null); setReassignVehicleId(""); setReassignDriverId(""); setReassignReason(""); }}
-                className="px-4 py-2.5 border border-border text-text-primary rounded-lg font-medium text-sm hover:bg-ops-bg transition-colors"
               >
                 Cancel
-              </button>
+              </Button>
             </div>
           </div>
         </Modal>

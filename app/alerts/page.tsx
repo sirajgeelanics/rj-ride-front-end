@@ -104,7 +104,7 @@ function OpenOffersSection({ offers, now }: { offers: OpenOffer[]; now: number }
   return (
     <div className="space-y-2">
       <div className="flex items-baseline justify-between">
-        <h3 className="text-sm font-semibold text-text-primary">Awaiting your response</h3>
+        <h3 className="font-serif text-lg font-medium text-text-primary">Awaiting your response</h3>
         <span className="text-xs text-text-muted">
           {offers.length} open offer{offers.length === 1 ? "" : "s"}
         </span>
@@ -117,7 +117,7 @@ function OpenOffersSection({ offers, now }: { offers: OpenOffer[]; now: number }
             <Link
               key={o.id}
               href="/offers"
-              className={`block rounded-xl p-4 border transition-colors hover:border-brand-blue/50 ${
+              className={`block rounded-2xl p-4 border transition-colors hover:border-brand-blue/50 ${
                 alerted ? "border-danger/30 bg-danger/5" : "border-warning/30 bg-warning/5"
               }`}
             >
@@ -171,7 +171,7 @@ function OpenOffersSection({ offers, now }: { offers: OpenOffer[]; now: number }
 function NotificationsSection({ items, now }: { items: InAppNotification[]; now: number }) {
   return (
     <div className="space-y-2">
-      <h3 className="text-sm font-semibold text-text-primary">Notifications</h3>
+      <h3 className="font-serif text-lg font-medium text-text-primary">Notifications</h3>
       {items.length === 0 ? (
         <p className="text-sm text-text-muted py-4">Nothing yet.</p>
       ) : (
@@ -298,15 +298,15 @@ export default function AlertsPage() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className={`rounded-xl p-4 border ${highCount > 0 ? "bg-danger/5 border-danger/20" : "bg-card-bg border-card-border"}`}>
+        <div className={`rounded-2xl p-4 border ${highCount > 0 ? "bg-danger/5 border-danger/20" : "bg-card-bg border-card-border"}`}>
           <p className="text-xs text-text-muted uppercase tracking-wider">High</p>
           <p className={`text-2xl font-bold mt-1 ${highCount > 0 ? "text-danger" : "text-text-primary"}`}>{highCount}</p>
         </div>
-        <div className={`rounded-xl p-4 border ${mediumCount > 0 ? "bg-warning/5 border-warning/20" : "bg-card-bg border-card-border"}`}>
+        <div className={`rounded-2xl p-4 border ${mediumCount > 0 ? "bg-warning/5 border-warning/20" : "bg-card-bg border-card-border"}`}>
           <p className="text-xs text-text-muted uppercase tracking-wider">Medium</p>
           <p className={`text-2xl font-bold mt-1 ${mediumCount > 0 ? "text-warning" : "text-text-primary"}`}>{mediumCount}</p>
         </div>
-        <div className="rounded-xl p-4 border bg-card-bg border-card-border">
+        <div className="rounded-2xl p-4 border bg-card-bg border-card-border">
           <p className="text-xs text-text-muted uppercase tracking-wider">Total</p>
           <p className="text-2xl font-bold text-text-primary mt-1">{totalCount}</p>
         </div>
@@ -316,7 +316,7 @@ export default function AlertsPage() {
 
       <NotificationsSection items={notifications} now={now} />
 
-      <h3 className="text-sm font-semibold text-text-primary">Fleet status</h3>
+      <h3 className="font-serif text-lg font-medium text-text-primary">Fleet status</h3>
 
       {alerts.length === 0 ? (
         // The full-height all-clear only when the whole page is genuinely empty; otherwise it
@@ -337,7 +337,7 @@ export default function AlertsPage() {
       ) : (
         <div className="space-y-3">
           {alerts.map((alert) => (
-            <div key={alert.id} className={`rounded-xl p-4 border ${severityStyle(alert.severity)}`}>
+            <div key={alert.id} className={`rounded-2xl p-4 border ${severityStyle(alert.severity)}`}>
               <div className="flex items-start gap-3">
                 <div className="mt-0.5 shrink-0">
                   <SeverityIcon severity={alert.severity} />

@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@/components/ui/Button";
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiClient, keys, formatMoney, useLanguageStore, t } from "@/lib/shared";
@@ -40,19 +41,19 @@ function PayoutsTab() {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-card-bg border border-card-border rounded-xl p-4">
+        <div className="bg-card-bg border border-card-border rounded-2xl card-soft p-4">
           <p className="text-xs text-text-muted uppercase tracking-wider">Pending</p>
           <p className="text-xl font-bold text-warning mt-1">
             {payouts.length > 0 ? formatMoney(totalPending, currency) : "—"}
           </p>
         </div>
-        <div className="bg-card-bg border border-card-border rounded-xl p-4">
+        <div className="bg-card-bg border border-card-border rounded-2xl card-soft p-4">
           <p className="text-xs text-text-muted uppercase tracking-wider">Paid Out</p>
           <p className="text-xl font-bold text-success mt-1">
             {payouts.length > 0 ? formatMoney(totalPaid, currency) : "—"}
           </p>
         </div>
-        <div className="bg-card-bg border border-card-border rounded-xl p-4">
+        <div className="bg-card-bg border border-card-border rounded-2xl card-soft p-4">
           <p className="text-xs text-text-muted uppercase tracking-wider">Total Payouts</p>
           <p className="text-xl font-bold text-text-primary mt-1">{payouts.length}</p>
         </div>
@@ -66,10 +67,10 @@ function PayoutsTab() {
       ) : (
         <div className="space-y-3">
           {payouts.map((payout) => (
-            <div key={payout.id} className="bg-card-bg border border-card-border rounded-xl p-4">
+            <div key={payout.id} className="bg-card-bg border border-card-border rounded-2xl card-soft p-4">
               <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 bg-brand-blue/10 rounded-lg flex items-center justify-center shrink-0">
+                  <div className="w-9 h-9 bg-brand-blue/10 rounded-xl flex items-center justify-center shrink-0">
                     <DollarSign className="w-4 h-4 text-brand-blue" />
                   </div>
                   <div>
@@ -146,10 +147,10 @@ function StatementsTab() {
   return (
     <div className="space-y-3">
       {statements.map((stmt) => (
-        <div key={stmt.id} className="bg-card-bg border border-card-border rounded-xl p-4">
+        <div key={stmt.id} className="bg-card-bg border border-card-border rounded-2xl card-soft p-4">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 bg-brand-blue/10 rounded-lg flex items-center justify-center shrink-0">
+              <div className="w-9 h-9 bg-brand-blue/10 rounded-xl flex items-center justify-center shrink-0">
                 <FileText className="w-4 h-4 text-brand-blue" />
               </div>
               <div>
@@ -164,12 +165,9 @@ function StatementsTab() {
                 </p>
               </div>
             </div>
-            <button
-              onClick={() => handleDownload(stmt.id)}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-brand-blue border border-brand-blue/30 rounded-lg hover:bg-brand-blue/5 transition-colors font-medium"
-            >
+            <Button variant="secondary" size="sm" onClick={() => handleDownload(stmt.id)}>
               <Download className="w-3 h-3" /> Download
-            </button>
+            </Button>
           </div>
         </div>
       ))}

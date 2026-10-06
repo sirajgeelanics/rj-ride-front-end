@@ -56,29 +56,31 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen = false, onMobileCl
   if (pathname === "/login") return null;
 
   const sidebarContent = (
-    // FL8 (c.fl8.in) editorial shell: light card rail with a hairline right border, muted nav
-    // labels that darken on hover, wine primary for the active route.
-    <aside className="w-60 min-h-screen bg-card-bg border-r border-border flex flex-col">
+    // Deep navy rail with a faint radial glow; active route = translucent white pill + gold bar.
+    <aside className="relative w-60 min-h-screen flex flex-col text-white overflow-hidden bg-[radial-gradient(120%_60%_at_0%_0%,rgba(179,150,97,0.16),transparent_55%),linear-gradient(180deg,#0A3470_0%,#072D62_45%,#051F45_100%)] border-r border-white/5">
       {/* Logo */}
-      <div className="px-5 py-4 border-b border-border flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
-          <span className="w-2.5 h-2.5 rounded-full bg-brand-wine flex-shrink-0" />
+      <div className="px-5 py-5 border-b border-white/10 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <span className="w-9 h-9 rounded-xl bg-white/10 ring-1 ring-white/15 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] flex items-center justify-center shrink-0">
+            <span className="w-2.5 h-2.5 rounded-full bg-accent-gold" />
+          </span>
           <div>
-            <p className="display-serif text-text-primary text-lg leading-none">{t('rideTM', language)}</p>
-            <p className="text-text-tertiary text-[10px] uppercase tracking-[0.16em] mt-1">{t('vendorPortal', language)}</p>
+            <p className="font-serif text-white text-2xl leading-none tracking-tight">{t('rideTM', language)}</p>
+            <p className="text-accent-gold text-[10px] uppercase tracking-[0.2em] mt-1.5">{t('vendorPortal', language)}</p>
           </div>
         </div>
         {/* Mobile close button */}
         <button
           onClick={onMobileClose}
-          className="lg:hidden p-1 text-text-tertiary hover:text-text-primary transition-colors"
+          aria-label="Close menu"
+          className="lg:hidden p-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors"
         >
           <X className="w-5 h-5" />
         </button>
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 py-3 px-3 space-y-0.5">
+      <nav className="flex-1 py-4 px-3 space-y-1">
         {NAV_ITEMS.map((item) => {
           const isActive = pathname === item.href;
           const Icon = item.icon;
@@ -87,35 +89,37 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen = false, onMobileCl
               key={item.href}
               href={item.href}
               onClick={handleNavClick}
-              className={`group relative flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors ${
+              aria-current={isActive ? "page" : undefined}
+              className={`group relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm outline-none focus-visible:ring-2 focus-visible:ring-accent-gold transition-[color,background-color,transform] duration-200 ${
                 isActive
-                  ? "text-brand-wine font-medium bg-brand-wine/[0.08]"
-                  : "text-text-secondary hover:text-text-primary hover:bg-table-header"
+                  ? "text-white font-medium bg-white/[0.12] shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]"
+                  : "text-white/70 hover:text-white hover:bg-white/[0.07] hover:translate-x-0.5"
               }`}
             >
               {isActive && (
-                <span className="absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-full bg-brand-wine" />
+                <span className="absolute left-0 top-2 bottom-2 w-[3px] rounded-full bg-accent-gold animate-fade-in" />
               )}
-              <Icon className={`w-[18px] h-[18px] shrink-0 ${isActive ? "text-brand-wine" : "text-text-tertiary group-hover:text-text-primary"}`} />
+              <Icon className={`w-[18px] h-[18px] shrink-0 ${isActive ? "text-accent-gold" : "text-white/60 group-hover:text-white"}`} />
               <span className="flex-1">{t(item.labelKey, language)}</span>
               {item.href === "/offers" && pendingOffers > 0 && (
                 <span
-                  className="min-w-[18px] h-[18px] px-1 rounded-full bg-brand-wine text-white text-[10px] font-bold flex items-center justify-center"
+                  className="min-w-[18px] h-[18px] px-1 rounded-full bg-accent-gold text-[#072D62] text-[10px] font-bold flex items-center justify-center animate-pulse"
                   title={`${pendingOffers} offer${pendingOffers === 1 ? "" : "s"} awaiting your response`}
                 >
                   {pendingOffers}
                 </span>
               )}
-              <span className="text-[10px] text-text-tertiary font-mono hidden lg:inline">{item.shortcut}</span>
+              <span className="text-[10px] text-white/35 font-mono hidden lg:inline">{item.shortcut}</span>
             </Link>
           );
         })}
       </nav>
 
       {/* Logout */}
-      <div className="px-3 pb-4 border-t border-border pt-3">          <button
+      <div className="px-3 pb-4 border-t border-white/10 pt-3">
+        <button
           onClick={handleLogout}
-          className="flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-text-secondary hover:text-danger hover:bg-table-header transition-colors w-full"
+          className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-white/70 hover:text-white hover:bg-white/[0.08] outline-none focus-visible:ring-2 focus-visible:ring-accent-gold transition-colors w-full"
         >
           <LogOut className="w-[18px] h-[18px] shrink-0" />
           {t('logout', language)}
@@ -135,9 +139,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen = false, onMobileCl
       {mobileOpen && (
         <div className="lg:hidden fixed inset-0 z-50">
           {/* Backdrop */}
-          <div className="absolute inset-0 bg-[#072D62]/40" onClick={onMobileClose} />
+          <div className="absolute inset-0 bg-[#051F45]/45 backdrop-blur-[3px] animate-fade-in" onClick={onMobileClose} />
           {/* Sidebar panel */}
-          <div className="absolute left-0 top-0 h-full shadow-2xl animate-in slide-in-from-left">
+          <div className="absolute left-0 top-0 h-full shadow-2xl animate-slide-in-left">
             {sidebarContent}
           </div>
         </div>

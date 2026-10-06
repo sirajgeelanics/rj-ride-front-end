@@ -10,9 +10,9 @@ interface LoadingSkeletonProps {
 
 export const LoadingSkeleton: React.FC<LoadingSkeletonProps> = ({ rows = 5, height = "h-10", className = "" }) => {
   return (
-    <div className={`space-y-3 ${className}`}>
+    <div className={`space-y-3 ${className}`} aria-busy="true" aria-live="polite">
       {Array.from({ length: rows }).map((_, i) => (
-        <div key={i} className={`${height} bg-ops-bg rounded animate-pulse`} />
+        <div key={i} className={`${height} skeleton`} style={{ animationDelay: `${i * 90}ms` }} />
       ))}
     </div>
   );

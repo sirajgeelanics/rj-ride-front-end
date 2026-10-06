@@ -32,8 +32,8 @@ export const OfflineBanner: React.FC = () => {
   if (!isOffline) return null;
 
   return (
-    <div className="sticky top-16 z-30 w-full bg-amber-50 border-b border-amber-200 px-4 lg:px-6 py-2 flex items-center justify-between">
-      <div className="flex items-center gap-2 text-sm text-amber-800">
+    <div className="sticky top-14 z-30 w-full bg-[#FBF3E4]/95 backdrop-blur border-b border-warning/30 px-4 lg:px-6 py-2 flex items-center justify-between animate-fade-in">
+      <div className="flex items-center gap-2 text-sm text-[#7A5115] font-medium">
         <WifiOff className="w-4 h-4 shrink-0" />
         <span>Offline — showing cached data</span>
       </div>
@@ -44,7 +44,7 @@ export const OfflineBanner: React.FC = () => {
             window.location.reload();
           }
         }}
-        className="flex items-center gap-1 text-xs text-amber-700 hover:text-amber-900 font-medium transition-colors"
+        className="flex items-center gap-1 text-xs text-[#7A5115] hover:bg-warning/15 px-2 py-1 rounded-md font-medium transition-colors"
       >
         <RefreshCw className="w-3 h-3" /> Retry
       </button>

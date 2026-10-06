@@ -36,22 +36,29 @@ export const Modal: React.FC<ModalProps> = ({ open, onClose, title, children, si
   // for the call sites that already pass a stable `open` prop to an always-rendered <Modal>.
   return (
     <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={title}
       className={`fixed inset-0 z-50 flex items-center justify-center p-4 transition-opacity duration-200 ${
         open ? "opacity-100" : "opacity-0 pointer-events-none"
       }`}
     >
-      <div className="absolute inset-0 bg-[#072D62]/40 backdrop-blur-sm" onClick={confirmModal ? undefined : onClose} />
+      <div className="absolute inset-0 bg-[#051F45]/45 backdrop-blur-[3px]" onClick={confirmModal ? undefined : onClose} />
       <div
-        className={`relative bg-card-bg rounded-xl shadow-2xl w-full ${sizeClasses[size]} max-h-[90vh] overflow-y-auto transition-transform duration-200 ${
-          open ? "scale-100" : "scale-95"
+        className={`relative bg-card-bg rounded-2xl border border-card-border shadow-[var(--shadow-modal)] w-full ${sizeClasses[size]} max-h-[90vh] overflow-y-auto scroll-thin transition-[transform,translate] duration-300 ease-[var(--ease-out-expo)] ${
+          open ? "scale-100 translate-y-0" : "scale-95 translate-y-2"
         }`}
       >
         {title && (
-          <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-            <h3 className="text-lg font-semibold text-text-primary">{title}</h3>
+          <div className="flex items-center justify-between px-6 py-4 border-b border-border sticky top-0 bg-card-bg/95 backdrop-blur z-10 rounded-t-2xl">
+            <h3 className="font-serif text-xl font-medium text-text-primary tracking-tight">{title}</h3>
             {!confirmModal && (
-              <button onClick={onClose} className="p-1 hover:bg-table-header rounded-lg transition-colors">
-                <X className="w-5 h-5 text-text-muted" />
+              <button
+                onClick={onClose}
+                aria-label="Close"
+                className="p-1.5 -mr-1.5 hover:bg-table-header rounded-lg transition-colors text-text-muted hover:text-text-primary"
+              >
+                <X className="w-5 h-5" />
               </button>
             )}
           </div>

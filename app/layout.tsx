@@ -173,7 +173,7 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
             onClick={() => {
               void logout().then(() => router.replace("/login"));
             }}
-            className="mt-2 px-4 py-2 rounded-lg bg-brand-blue text-white text-sm font-medium hover:opacity-90"
+            className="mt-2 px-4 py-2 rounded-lg bg-brand-blue text-white text-sm font-medium hover:bg-brand-wine-hover shadow-[var(--shadow-soft)] transition-colors"
           >
             Sign out and use a vendor account
           </button>
@@ -199,7 +199,11 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
+    <html
+      lang="en"
+      data-scroll-behavior="smooth"
+      className={`${geistSans.variable} ${geistMono.variable}`}
+    >
       <head>
         {/* Without this, mobile browsers render at a virtual desktop width and shrink the
             page to fit — every lg:/mobile-responsive class below would be moot on a real

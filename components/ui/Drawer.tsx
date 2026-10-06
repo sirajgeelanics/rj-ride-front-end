@@ -27,17 +27,21 @@ export const Drawer: React.FC<DrawerProps> = ({ open, onClose, title, children, 
   // makes both open AND close smooth. Matches rideadmin's own Drawer, which already does this.
   return (
     <div className={`fixed inset-0 z-50 ${open ? "" : "pointer-events-none"}`}>
-      {open && <div className="absolute inset-0 bg-[#072D62]/30" onClick={onClose} />}
+      {open && <div className="absolute inset-0 bg-[#051F45]/35 backdrop-blur-[2px] animate-fade-in" onClick={onClose} />}
       <div
-        className={`absolute right-0 top-0 h-full w-full ${width} bg-card-bg shadow-2xl overflow-y-auto transition-transform duration-300 ease-in-out ${
+        className={`absolute right-0 top-0 h-full w-full ${width} bg-card-bg border-l border-card-border shadow-[var(--shadow-modal)] overflow-y-auto scroll-thin transition-transform duration-300 ease-[var(--ease-out-expo)] ${
           open ? "translate-x-0" : "translate-x-full"
         }`}
       >
         {title && (
-          <div className="flex items-center justify-between px-6 py-4 border-b border-border sticky top-0 bg-card-bg z-10">
-            <h3 className="text-lg font-semibold text-text-primary">{title}</h3>
-            <button onClick={onClose} className="p-1 hover:bg-table-header rounded-lg transition-colors">
-              <X className="w-5 h-5 text-text-muted" />
+          <div className="flex items-center justify-between px-6 py-4 border-b border-border sticky top-0 bg-card-bg/95 backdrop-blur z-10">
+            <h3 className="font-serif text-xl font-medium text-text-primary tracking-tight">{title}</h3>
+            <button
+              onClick={onClose}
+              aria-label="Close"
+              className="p-1.5 -mr-1.5 hover:bg-table-header rounded-lg transition-colors text-text-muted hover:text-text-primary"
+            >
+              <X className="w-5 h-5" />
             </button>
           </div>
         )}

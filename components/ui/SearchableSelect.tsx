@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useId, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 interface Option {
@@ -33,6 +33,7 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
   placeholder = "Search…",
   className = "",
 }) => {
+  const listId = useId();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [highlight, setHighlight] = useState(0);
@@ -144,11 +145,17 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
             setQuery("");
           }
         }}
-        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        role="combobox"
+        aria-expanded={open}
+        aria-controls={listId}
+        aria-autocomplete="list"
+        className="input-field"
       />
       {open && pos && typeof document !== "undefined" && createPortal(
         <div
           ref={menuRef}
+          id={listId}
+          role="listbox"
           style={{
             position: "fixed",
             left: pos.left,
@@ -157,10 +164,10 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
               ? { top: pos.top }
               : { bottom: window.innerHeight - pos.top }),
           }}
-          className="z-[100] max-h-56 overflow-auto bg-white border border-slate-300 rounded-lg shadow-xl"
+          className="z-[100] max-h-56 overflow-auto scroll-thin bg-white border border-card-border rounded-xl p-1 shadow-[var(--shadow-lift)] animate-dropdown-in"
         >
           {filtered.length === 0 ? (
-            <div className="px-3 py-2 text-sm text-slate-500">No matches</div>
+            <div className="px-3 py-2 text-sm text-text-muted">No matches</div>
           ) : (
             filtered.map((opt, i) => (
               <div
@@ -175,15 +182,15 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
                 onMouseEnter={() => !opt.disabled && setHighlight(i)}
                 className={
                   opt.disabled
-                    ? "px-3 py-2 text-sm flex items-center justify-between gap-2 text-slate-400 bg-slate-50 cursor-not-allowed"
-                    : `px-3 py-2 text-sm flex items-center justify-between gap-2 cursor-pointer hover:bg-blue-50 ${
-                        i === highlight ? "bg-blue-50" : ""
-                      } ${opt.value === value ? "font-medium text-blue-700" : "text-slate-800"}`
+                    ? "px-3 py-2 text-sm flex items-center justify-between gap-2 text-text-muted bg-page-bg rounded-lg cursor-not-allowed"
+                    : `px-3 py-2 text-sm flex items-center justify-between gap-2 cursor-pointer rounded-lg transition-colors ${
+                        i === highlight ? "bg-table-header" : ""
+                      } ${opt.value === value ? "font-semibold text-brand-blue" : "text-text-primary"}`
                 }
               >
                 <span className={opt.disabled ? "line-through" : ""}>{opt.label}</span>
                 {opt.disabled && opt.hint && (
-                  <span className="text-xs shrink-0 px-1.5 py-0.5 rounded bg-slate-200 text-slate-600">
+                  <span className="text-xs shrink-0 px-1.5 py-0.5 rounded bg-table-header text-text-secondary">
                     {opt.hint}
                   </span>
                 )}

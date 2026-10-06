@@ -11,6 +11,7 @@ const nextConfig: NextConfig = {
   // submit). Allow the LAN host(s) explicitly. Extend this list for other dev hostnames.
   allowedDevOrigins: [
     "192.168.1.39",
+    "192.168.1.28",
     "ride.local",
     "vendor.local",
     "ride.192.168.1.39.nip.io",

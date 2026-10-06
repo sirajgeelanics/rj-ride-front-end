@@ -7,11 +7,20 @@ import type { components } from "@/lib/shared/api/schema.d";
 import { useVendorTrips } from "@/hooks/useVendorTrips";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Tabs } from "@/components/ui/Tabs";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/ui/Toast";
-import { Truck, Users, Wrench, Search, X } from "lucide-react";
+import { Truck, Users, Wrench, Search, X, ChevronLeft, ChevronRight } from "lucide-react";
 
 type Vehicle = components["schemas"]["Vehicle"];
 type Driver = components["schemas"]["Driver"];
+
+function AirportChip({ code }: { code: string }) {
+  return (
+    <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-brand-blue/10 text-brand-blue">
+      {code}
+    </span>
+  );
+}
 
 const TABS = [
   { id: "vehicles", label: "Vehicles" },
@@ -79,23 +88,129 @@ function FleetStatusBadge({
  * full URL, so the cursor has to be pulled back out of it — passing the URL itself as `cursor`
  * 404s. The page cap is a runaway guard, not an expected limit.
  */
-async function fetchAllVehicles(): Promise<Vehicle[]> {
-  const all: Vehicle[] = [];
+const MAX_PAGES = 200;
+const SERVER_PAGE_SIZE = 100;
+
+type PageResult<T> = { results?: T[]; next?: string | null };
+
+async function fetchAllPages<T>(
+  fetchPage: (cursor: string | undefined) => Promise<PageResult<T>>
+): Promise<T[]> {
+  const all: T[] = [];
   let cursor: string | undefined;
 
-  for (let page = 0; page < 40; page++) {
+  for (let page = 0; page < MAX_PAGES; page++) {
+    const res = await fetchPage(cursor);
+    all.push(...(res.results ?? []));
+
+    if (!res.next) return all;
+    cursor = new URL(res.next, window.location.origin).searchParams.get("cursor") ?? undefined;
+    if (!cursor) return all;
+  }
+  throw new Error("Too many pages while loading the fleet list");
+}
+
+async function fetchAllVehicles(): Promise<Vehicle[]> {
+  return fetchAllPages<Vehicle>(async (cursor) => {
     const { data: res, error: err } = await apiClient.GET("/v1/fleet/vehicles", {
-      params: { query: cursor ? { cursor } : {} },
+      params: { query: { page_size: SERVER_PAGE_SIZE, ...(cursor ? { cursor } : {}) } },
     });
     if (err) throw err;
-    all.push(...((res?.results ?? []) as Vehicle[]));
+    return { results: (res?.results ?? []) as Vehicle[], next: res?.next };
+  });
+}
 
-    const next = res?.next;
-    if (!next) break;
-    cursor = new URL(next, window.location.origin).searchParams.get("cursor") ?? undefined;
-    if (!cursor) break;
-  }
-  return all;
+async function fetchAllDrivers(): Promise<Driver[]> {
+  return fetchAllPages<Driver>(async (cursor) => {
+    const { data: res, error: err } = await apiClient.GET("/v1/fleet/drivers", {
+      params: { query: { page_size: SERVER_PAGE_SIZE, ...(cursor ? { cursor } : {}) } },
+    });
+    if (err) throw err;
+    return { results: (res?.results ?? []) as Driver[], next: res?.next };
+  });
+}
+
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
+
+function usePagination<T>(items: T[], resetKey: string) {
+  const [pageSize, setPageSize] = useState(25);
+  const scope = `${resetKey}|${pageSize}`;
+  const [pageState, setPageState] = useState({ scope, page: 1 });
+  const page = pageState.scope === scope ? pageState.page : 1;
+  const setPage = (p: number) => setPageState({ scope, page: p });
+
+  const pageCount = Math.max(1, Math.ceil(items.length / pageSize));
+  const current = Math.min(page, pageCount);
+  const start = (current - 1) * pageSize;
+  const pageItems = useMemo(() => items.slice(start, start + pageSize), [items, start, pageSize]);
+
+  return { pageItems, page: current, setPage, pageCount, pageSize, setPageSize, start, total: items.length };
+}
+
+function Pagination({
+  page,
+  pageCount,
+  pageSize,
+  start,
+  total,
+  shown,
+  noun,
+  onPage,
+  onPageSize,
+}: {
+  page: number;
+  pageCount: number;
+  pageSize: number;
+  start: number;
+  total: number;
+  shown: number;
+  noun: string;
+  onPage: (p: number) => void;
+  onPageSize: (n: number) => void;
+}) {
+  if (total === 0) return null;
+  const btn =
+    "flex items-center gap-1 h-8 px-3 text-xs rounded-lg border border-border bg-white shadow-[var(--shadow-soft)] text-text-primary hover:bg-page-bg transition-colors disabled:opacity-40 disabled:shadow-none";
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+      <span className="text-xs text-text-muted">
+        Showing {start + 1}–{start + shown} of {total} {noun}
+        {total === 1 ? "" : "s"}
+      </span>
+      <div className="flex items-center gap-2">
+        <label className="flex items-center gap-1.5 text-xs text-text-muted">
+          Per page
+          <select
+            value={pageSize}
+            onChange={(e) => onPageSize(Number(e.target.value))}
+            className="input-field !h-8 !w-auto !px-2 !text-xs"
+          >
+            {PAGE_SIZE_OPTIONS.map((n) => (
+              <option key={n} value={n}>
+                {n}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button type="button" className={btn} disabled={page <= 1} onClick={() => onPage(page - 1)}>
+          <ChevronLeft className="w-3 h-3" />
+          Prev
+        </button>
+        <span className="text-xs text-text-muted tabular-nums">
+          Page {page} of {pageCount}
+        </span>
+        <button
+          type="button"
+          className={btn}
+          disabled={page >= pageCount}
+          onClick={() => onPage(page + 1)}
+        >
+          Next
+          <ChevronRight className="w-3 h-3" />
+        </button>
+      </div>
+    </div>
+  );
 }
 
 type TypeCount = {
@@ -135,7 +250,7 @@ function VehicleTypeSummary({ counts }: { counts: TypeCount[] }) {
   return (
     <div className="space-y-2">
       <div className="flex items-baseline justify-between">
-        <h3 className="text-sm font-semibold text-text-primary">By vehicle type</h3>
+        <h3 className="font-serif text-lg font-medium text-text-primary">By vehicle type</h3>
         <span className="text-xs text-text-muted">
           {fleetTotal} vehicle{fleetTotal === 1 ? "" : "s"} · {counts.length} type
           {counts.length === 1 ? "" : "s"}
@@ -143,7 +258,7 @@ function VehicleTypeSummary({ counts }: { counts: TypeCount[] }) {
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
         {counts.map((c) => (
-          <div key={c.name} className="bg-card-bg border border-card-border rounded-xl p-3">
+          <div key={c.name} className="bg-card-bg border border-card-border rounded-2xl card-soft p-3">
             <div className="flex items-center justify-between gap-2">
               <span className="text-sm font-medium text-text-primary truncate" title={c.name}>
                 {c.name}
@@ -173,12 +288,15 @@ function VehiclesTab({ onTripIds, search }: { onTripIds: Set<string>; search: st
   const q = search.trim().toLowerCase();
   const filtered = useMemo(() => {
     if (!q) return vehicles;
-    return vehicles.filter((v) =>
-      [v.plate, v.vehicle_type_name, v.vehicle_name_display]
+    const compact = q.replace(/[\s-]+/g, "");
+    return vehicles.filter((v) => {
+      if (String(v.plate ?? "").toLowerCase().replace(/[\s-]+/g, "").includes(compact)) return true;
+      return [v.vehicle_type_name, v.vehicle_name_display]
         .filter(Boolean)
-        .some((field) => String(field).toLowerCase().includes(q))
-    );
+        .some((field) => String(field).toLowerCase().includes(q));
+    });
   }, [vehicles, q]);
+  const pager = usePagination(filtered, q);
 
   if (isLoading) return <div className="text-center py-8 text-text-muted text-sm">Loading vehicles…</div>;
   if (vehicles.length === 0) return (
@@ -196,13 +314,13 @@ function VehiclesTab({ onTripIds, search }: { onTripIds: Set<string>; search: st
         <p className="text-center py-8 text-text-muted text-sm">No vehicles match “{search}”.</p>
       ) : (
       <div className="space-y-3">
-      {filtered.map((vehicle) => {
+      {pager.pageItems.map((vehicle) => {
         const brokenDown = (vehicle as unknown as { status?: string }).status === "breakdown";
         return (
-        <div key={vehicle.id} className="bg-card-bg border border-card-border rounded-xl p-4">
+        <div key={vehicle.id} className="bg-card-bg border border-card-border rounded-2xl card-soft p-4">
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-start gap-3">
-              <div className="w-10 h-10 bg-brand-blue/10 rounded-lg flex items-center justify-center shrink-0">
+              <div className="w-10 h-10 bg-brand-blue/10 rounded-xl flex items-center justify-center shrink-0">
                 <Truck className="w-5 h-5 text-brand-blue" />
               </div>
               <div className="space-y-1">
@@ -213,6 +331,7 @@ function VehiclesTab({ onTripIds, search }: { onTripIds: Set<string>; search: st
                     onTrip={onTripIds.has(vehicle.id)}
                     brokenDown={brokenDown}
                   />
+                  {vehicle.airport_code && <AirportChip code={vehicle.airport_code} />}
                 </div>
                 {(vehicle.vehicle_type_name || vehicle.vehicle_name_display) && (
                   <p className="text-sm text-text-muted">
@@ -230,18 +349,26 @@ function VehiclesTab({ onTripIds, search }: { onTripIds: Set<string>; search: st
       })}
       </div>
       )}
+
+      <Pagination
+        page={pager.page}
+        pageCount={pager.pageCount}
+        pageSize={pager.pageSize}
+        start={pager.start}
+        total={pager.total}
+        shown={pager.pageItems.length}
+        noun="vehicle"
+        onPage={pager.setPage}
+        onPageSize={pager.setPageSize}
+      />
     </div>
   );
 }
 
 function DriversTab({ onTripIds, search }: { onTripIds: Set<string>; search: string }) {
   const { data: drivers = [], isLoading } = useQuery({
-    queryKey: keys.fleet.drivers.list({}),
-    queryFn: async () => {
-      const { data: res, error: err } = await apiClient.GET("/v1/fleet/drivers", {});
-      if (err) throw err;
-      return (res?.results ?? []) as Driver[];
-    },
+    queryKey: keys.fleet.drivers.list({ all: true }),
+    queryFn: fetchAllDrivers,
   });
 
   const q = search.trim().toLowerCase();
@@ -251,6 +378,7 @@ function DriversTab({ onTripIds, search }: { onTripIds: Set<string>; search: str
       [d.name, d.phone].filter(Boolean).some((field) => String(field).toLowerCase().includes(q))
     );
   }, [drivers, q]);
+  const pager = usePagination(filtered, q);
 
   if (isLoading) return <div className="text-center py-8 text-text-muted text-sm">Loading drivers…</div>;
   if (drivers.length === 0) return (
@@ -265,17 +393,18 @@ function DriversTab({ onTripIds, search }: { onTripIds: Set<string>; search: str
 
   return (
     <div className="space-y-3">
-      {filtered.map((driver) => (
-        <div key={driver.id} className="bg-card-bg border border-card-border rounded-xl p-4">
+      {pager.pageItems.map((driver) => (
+        <div key={driver.id} className="bg-card-bg border border-card-border rounded-2xl card-soft p-4">
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-start gap-3">
-              <div className="w-10 h-10 bg-success/10 rounded-lg flex items-center justify-center shrink-0">
+              <div className="w-10 h-10 bg-success/10 rounded-xl flex items-center justify-center shrink-0">
                 <Users className="w-5 h-5 text-success" />
               </div>
               <div className="space-y-1">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-semibold text-text-primary">{driver.name}</span>
                   <FleetStatusBadge isActive={driver.is_active !== false} onTrip={onTripIds.has(driver.id)} />
+                  {driver.airport_code && <AirportChip code={driver.airport_code} />}
                 </div>
                 <p className="text-sm text-text-muted font-mono">{driver.phone}</p>
               </div>
@@ -284,6 +413,18 @@ function DriversTab({ onTripIds, search }: { onTripIds: Set<string>; search: str
           </div>
         </div>
       ))}
+
+      <Pagination
+        page={pager.page}
+        pageCount={pager.pageCount}
+        pageSize={pager.pageSize}
+        start={pager.start}
+        total={pager.total}
+        shown={pager.pageItems.length}
+        noun="driver"
+        onPage={pager.setPage}
+        onPageSize={pager.setPageSize}
+      />
     </div>
   );
 }
@@ -303,13 +444,15 @@ function BreakdownTab({ driverTripIds }: { driverTripIds: Set<string> }) {
     queryFn: fetchAllVehicles,
   });
   const { data: drivers = [], isLoading: driversLoading } = useQuery({
-    queryKey: keys.fleet.drivers.list({}),
-    queryFn: async () => {
-      const { data: res, error: err } = await apiClient.GET("/v1/fleet/drivers", {});
-      if (err) throw err;
-      return (res?.results ?? []) as Driver[];
-    },
+    queryKey: keys.fleet.drivers.list({ all: true }),
+    queryFn: fetchAllDrivers,
   });
+
+  const [pendingAction, setPendingAction] = useState<{
+    kind: "vehicle" | "driver";
+    id: string;
+    label: string;
+  } | null>(null);
 
   const markRepaired = useMutation({
     mutationFn: async (vehicleId: string) => {
@@ -343,7 +486,7 @@ function BreakdownTab({ driverTripIds }: { driverTripIds: Set<string> }) {
       return body?.result;
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: keys.fleet.drivers.list({}) });
+      void queryClient.invalidateQueries({ queryKey: keys.fleet.drivers.list({ all: true }) });
       addToast("Driver marked available", "success");
     },
     onError: (err: unknown) => {
@@ -380,14 +523,14 @@ function BreakdownTab({ driverTripIds }: { driverTripIds: Set<string> }) {
     <div className="space-y-6">
       {brokenVehicles.length > 0 && (
         <div className="space-y-3">
-          <h3 className="text-sm font-semibold text-text-primary">
+          <h3 className="font-serif text-lg font-medium text-text-primary">
             Vehicles in breakdown ({brokenVehicles.length})
           </h3>
           {brokenVehicles.map((vehicle) => (
-            <div key={vehicle.id} className="bg-card-bg border border-card-border rounded-xl p-4">
+            <div key={vehicle.id} className="bg-card-bg border border-card-border rounded-2xl card-soft p-4">
               <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-danger/10 rounded-lg flex items-center justify-center shrink-0">
+                  <div className="w-10 h-10 bg-danger/10 rounded-xl flex items-center justify-center shrink-0">
                     <Truck className="w-5 h-5 text-danger" />
                   </div>
                   <div className="space-y-1">
@@ -405,7 +548,9 @@ function BreakdownTab({ driverTripIds }: { driverTripIds: Set<string> }) {
                   </div>
                 </div>
                 <button
-                  onClick={() => markRepaired.mutate(vehicle.id)}
+                  onClick={() =>
+                    setPendingAction({ kind: "vehicle", id: vehicle.id, label: vehicle.plate })
+                  }
                   disabled={markRepaired.isPending}
                   className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg font-medium bg-success/10 text-success border border-success/20 hover:bg-success/20 transition-colors disabled:opacity-50 shrink-0"
                 >
@@ -421,7 +566,7 @@ function BreakdownTab({ driverTripIds }: { driverTripIds: Set<string> }) {
       {stuckDrivers.length > 0 && (
         <div className="space-y-3">
           <div>
-            <h3 className="text-sm font-semibold text-text-primary">
+            <h3 className="font-serif text-lg font-medium text-text-primary">
               Drivers needing to be freed up ({stuckDrivers.length})
             </h3>
             <p className="text-xs text-text-muted">
@@ -430,10 +575,10 @@ function BreakdownTab({ driverTripIds }: { driverTripIds: Set<string> }) {
             </p>
           </div>
           {stuckDrivers.map((driver) => (
-            <div key={driver.id} className="bg-card-bg border border-card-border rounded-xl p-4">
+            <div key={driver.id} className="bg-card-bg border border-card-border rounded-2xl card-soft p-4">
               <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-warning/10 rounded-lg flex items-center justify-center shrink-0">
+                  <div className="w-10 h-10 bg-warning/10 rounded-xl flex items-center justify-center shrink-0">
                     <Users className="w-5 h-5 text-warning" />
                   </div>
                   <div className="space-y-1">
@@ -445,7 +590,9 @@ function BreakdownTab({ driverTripIds }: { driverTripIds: Set<string> }) {
                   </div>
                 </div>
                 <button
-                  onClick={() => markAvailable.mutate(driver.id)}
+                  onClick={() =>
+                    setPendingAction({ kind: "driver", id: driver.id, label: driver.name })
+                  }
                   disabled={markAvailable.isPending}
                   className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg font-medium bg-success/10 text-success border border-success/20 hover:bg-success/20 transition-colors disabled:opacity-50 shrink-0"
                 >
@@ -457,6 +604,24 @@ function BreakdownTab({ driverTripIds }: { driverTripIds: Set<string> }) {
           ))}
         </div>
       )}
+
+      <ConfirmDialog
+        open={pendingAction !== null}
+        title={pendingAction?.kind === "vehicle" ? "Mark vehicle repaired?" : "Mark driver available?"}
+        message={
+          pendingAction?.kind === "vehicle"
+            ? `${pendingAction.label} will go back into service and become available for new trips.`
+            : `${pendingAction?.label ?? "This driver"} will be marked available for new trips. Only do this once they are genuinely free.`
+        }
+        confirmLabel={pendingAction?.kind === "vehicle" ? "Mark repaired" : "Mark available"}
+        busy={markRepaired.isPending || markAvailable.isPending}
+        onCancel={() => setPendingAction(null)}
+        onConfirm={() => {
+          if (!pendingAction) return;
+          const mutation = pendingAction.kind === "vehicle" ? markRepaired : markAvailable;
+          mutation.mutate(pendingAction.id, { onSettled: () => setPendingAction(null) });
+        }}
+      />
     </div>
   );
 }
@@ -473,7 +638,7 @@ export default function FleetPage() {
 
   return (
     <div className="space-y-6">
-      <div>
+      <div className="flex items-center justify-between gap-3">
         <p className="text-sm text-text-muted mt-1">Manage your vehicles and drivers</p>
       </div>
 
@@ -486,8 +651,8 @@ export default function FleetPage() {
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder={activeTab === "vehicles" ? "Search by plate, type, or model…" : "Search by driver name or phone…"}
-            className="w-full pl-9 pr-9 py-2 bg-card-bg border border-card-border rounded-lg text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-blue"
+            placeholder={activeTab === "vehicles" ? "Search by plate number, type, or model…" : "Search by driver name or phone…"}
+            className="input-field pl-9 pr-9"
           />
           {search && (
             <button

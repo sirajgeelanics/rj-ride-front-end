@@ -60,10 +60,10 @@ export function DataTable<T extends Record<string, any>>({
 
   if (loading) {
     return (
-      <div className="bg-card-bg border border-card-border rounded-xl overflow-hidden">
-        <div className="p-6 space-y-4">
+      <div className="bg-card-bg border border-card-border rounded-2xl overflow-hidden card-soft">
+        <div className="p-5 space-y-3" aria-busy="true">
           {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="h-10 bg-ops-bg rounded animate-pulse" />
+            <div key={i} className="h-10 skeleton" style={{ animationDelay: `${i * 90}ms` }} />
           ))}
         </div>
       </div>
@@ -72,22 +72,24 @@ export function DataTable<T extends Record<string, any>>({
 
   if (data.length === 0) {
     return (
-      <div className="bg-card-bg border border-card-border rounded-xl p-12 flex flex-col items-center justify-center">
+      <div className="bg-card-bg border border-dashed border-card-border rounded-2xl p-12 flex flex-col items-center justify-center animate-fade-in">
         <p className="text-sm text-text-muted">{emptyMessage}</p>
       </div>
     );
   }
 
   return (
-    <div className="bg-card-bg border border-card-border rounded-xl overflow-hidden">
-      <div className="overflow-x-auto">
+    <div className="bg-card-bg border border-card-border rounded-2xl overflow-hidden card-soft">
+      <div className="overflow-x-auto scroll-thin">
         <table className="w-full text-sm">
           <thead>
-            <tr className="bg-table-header border-b border-border">
+            <tr className="border-b border-border">
               {columns.map((col) => (
                 <th
                   key={col.key}
-                  className={`px-4 py-3 text-left text-xs font-semibold text-text-muted uppercase tracking-wider ${col.className || ""} ${col.sortable ? "cursor-pointer hover:text-text-primary" : ""}`}
+                  scope="col"
+                  aria-sort={col.sortable && sortKey === col.key ? (sortDir === "asc" ? "ascending" : "descending") : undefined}
+                  className={`px-4 py-3 text-left text-[11px] font-semibold text-text-muted uppercase tracking-wider whitespace-nowrap bg-table-header sticky top-0 z-[1] ${col.className || ""} ${col.sortable ? "cursor-pointer select-none hover:text-text-primary transition-colors" : ""}`}
                   onClick={() => col.sortable && handleSort(col.key)}
                 >
                   <div className="flex items-center gap-1">
@@ -104,11 +106,11 @@ export function DataTable<T extends Record<string, any>>({
             {paged.map((item, idx) => (
               <tr
                 key={(item as Record<string, unknown>).id as string || (item as Record<string, unknown>).tripId as string || idx}
-                className={`border-b border-border/50 last:border-0 hover:bg-table-header/50 transition-colors ${onRowClick ? "cursor-pointer" : ""}`}
+                className={`border-b border-border/60 last:border-0 hover:bg-page-bg transition-colors ${onRowClick ? "cursor-pointer" : ""}`}
                 onClick={() => onRowClick?.(item)}
               >
                 {columns.map((col) => (
-                  <td key={col.key} className={`px-4 py-3 text-sm text-text-primary ${col.className || ""}`}>
+                  <td key={col.key} className={`px-4 py-3.5 text-sm text-text-primary ${col.className || ""}`}>
                     {col.render ? col.render(item) : item[col.key] ?? "—"}
                   </td>
                 ))}
@@ -119,7 +121,7 @@ export function DataTable<T extends Record<string, any>>({
       </div>
 
       {totalPages > 1 && (
-        <div className="flex items-center justify-between px-4 py-3 border-t border-border bg-ops-bg/30">
+        <div className="flex items-center justify-between px-4 py-3 border-t border-border bg-page-bg/60">
           <p className="text-xs text-text-muted">
             Showing {safePage * pageSize + 1}–{Math.min((safePage + 1) * pageSize, sorted.length)} of {sorted.length}
           </p>
@@ -127,15 +129,15 @@ export function DataTable<T extends Record<string, any>>({
             <button
               onClick={() => setPage((p) => Math.max(0, p - 1))}
               disabled={safePage === 0}
-              className="p-1.5 rounded hover:bg-table-header disabled:opacity-30 disabled:cursor-not-allowed"
+              aria-label="Previous page" className="p-1.5 rounded-lg border border-border bg-white shadow-[var(--shadow-soft)] hover:bg-table-header disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
-            <span className="text-xs text-text-muted">{safePage + 1} / {totalPages}</span>
+            <span className="text-xs text-text-muted tabular-nums px-1">{safePage + 1} / {totalPages}</span>
             <button
               onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
               disabled={safePage >= totalPages - 1}
-              className="p-1.5 rounded hover:bg-table-header disabled:opacity-30 disabled:cursor-not-allowed"
+              aria-label="Next page" className="p-1.5 rounded-lg border border-border bg-white shadow-[var(--shadow-soft)] hover:bg-table-header disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none"
             >
               <ChevronRight className="w-4 h-4" />
             </button>

@@ -82,7 +82,7 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold text-text-primary">
+        <h2 className="display-serif text-3xl text-text-primary tracking-tight">
           {t("welcomeBack", language)}, {displayName}
         </h2>
         <p className="text-sm text-text-muted mt-1">
@@ -100,7 +100,7 @@ export default function DashboardPage() {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <Link
           href="/trips?status=ASSIGNED"
-          className="flex items-center gap-3 px-4 py-3 bg-card-bg border border-card-border rounded-xl hover:shadow-md hover:border-brand-blue/30 transition-all group"
+          className="flex items-center gap-3 px-4 py-3 bg-card-bg border border-card-border rounded-2xl card-soft hover-lift group"
         >
           <div className="w-10 h-10 rounded-lg bg-warning/10 flex items-center justify-center group-hover:bg-warning/20 transition-colors">
             <Clock className="w-5 h-5 text-warning" />
@@ -113,7 +113,7 @@ export default function DashboardPage() {
 
         <Link
           href="/trips"
-          className="flex items-center gap-3 px-4 py-3 bg-card-bg border border-card-border rounded-xl hover:shadow-md hover:border-brand-blue/30 transition-all group"
+          className="flex items-center gap-3 px-4 py-3 bg-card-bg border border-card-border rounded-2xl card-soft hover-lift group"
         >
           <div className="w-10 h-10 rounded-lg bg-success/10 flex items-center justify-center group-hover:bg-success/20 transition-colors">
             <Truck className="w-5 h-5 text-success" />
@@ -126,7 +126,7 @@ export default function DashboardPage() {
 
         <Link
           href="/alerts"
-          className="flex items-center gap-3 px-4 py-3 bg-card-bg border border-card-border rounded-xl hover:shadow-md hover:border-brand-blue/30 transition-all group"
+          className="flex items-center gap-3 px-4 py-3 bg-card-bg border border-card-border rounded-2xl card-soft hover-lift group"
         >
           <div className="w-10 h-10 rounded-lg bg-danger/10 flex items-center justify-center group-hover:bg-danger/20 transition-colors">
             <Bell className="w-5 h-5 text-danger" />
@@ -139,7 +139,7 @@ export default function DashboardPage() {
 
         <Link
           href="/earnings"
-          className="flex items-center gap-3 px-4 py-3 bg-card-bg border border-card-border rounded-xl hover:shadow-md hover:border-brand-blue/30 transition-all group"
+          className="flex items-center gap-3 px-4 py-3 bg-card-bg border border-card-border rounded-2xl card-soft hover-lift group"
         >
           <div className="w-10 h-10 rounded-lg bg-brand-blue/10 flex items-center justify-center group-hover:bg-brand-blue/20 transition-colors">
             <CircleDollarSign className="w-5 h-5 text-brand-blue" />
@@ -152,9 +152,9 @@ export default function DashboardPage() {
       </div>
 
       {totalDrivers > 0 && (
-        <div className="bg-card-bg border border-card-border rounded-xl p-5">
+        <div className="bg-card-bg border border-card-border rounded-2xl card-soft p-5">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="font-semibold text-text-primary flex items-center gap-2">
+            <h3 className="font-serif text-lg font-medium text-text-primary flex items-center gap-2">
               <Users className="w-4 h-4 text-text-muted" />
               {t("fleetStatus", language)}
             </h3>
@@ -184,9 +184,9 @@ export default function DashboardPage() {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-card-bg border border-card-border rounded-xl p-5">
+        <div className="bg-card-bg border border-card-border rounded-2xl card-soft p-5">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-text-primary flex items-center gap-2">
+            <h3 className="font-serif text-lg font-medium text-text-primary flex items-center gap-2">
               <Clock className="w-4 h-4 text-warning" />
               {t("tripsNeedingAttention", language)}
               {needingAttention.length > 0 && (
@@ -220,9 +220,9 @@ export default function DashboardPage() {
           )}
         </div>
 
-        <div className="bg-card-bg border border-card-border rounded-xl p-5">
+        <div className="bg-card-bg border border-card-border rounded-2xl card-soft p-5">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-text-primary flex items-center gap-2">
+            <h3 className="font-serif text-lg font-medium text-text-primary flex items-center gap-2">
               <Truck className="w-4 h-4 text-success" />
               {t("activeTrips", language)}
             </h3>
