@@ -20,12 +20,12 @@ export default function OverviewPage() {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
-        <StatCard label="Tenants" value={data?.tenants ?? "—"} icon={Building2} hint={data ? `${data.active_tenants} active` : undefined} />
-        <StatCard label="Vendors" value={data?.vendors ?? "—"} icon={Truck} />
-        <StatCard label="Vehicles" value={data?.vehicles ?? "—"} icon={CarFront} />
-        <StatCard label="Drivers" value={data?.drivers ?? "—"} icon={Users} />
-        <StatCard label="Open trips" value={data?.trips.open ?? "—"} icon={Route} hint={data ? `${data.trips.total} total` : undefined} />
-        <StatCard label="New in 24h" value={data?.trips.created_last_24h ?? "—"} icon={Clock3} />
+        <StatCard tone="navy" label="Tenants" value={data?.tenants ?? "—"} icon={Building2} hint={data ? `${data.active_tenants} active` : undefined} />
+        <StatCard tone="blue" label="Vendors" value={data?.vendors ?? "—"} icon={Truck} />
+        <StatCard tone="green" label="Vehicles" value={data?.vehicles ?? "—"} icon={CarFront} />
+        <StatCard tone="blue" label="Drivers" value={data?.drivers ?? "—"} icon={Users} />
+        <StatCard tone="purple" label="Open trips" value={data?.trips.open ?? "—"} icon={Route} hint={data ? `${data.trips.total} total` : undefined} />
+        <StatCard tone="amber" label="New in 24h" value={data?.trips.created_last_24h ?? "—"} icon={Clock3} />
       </div>
 
       <section>

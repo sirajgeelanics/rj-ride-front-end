@@ -4,6 +4,7 @@ import React, { useEffect } from "react";
 import { Loader2, X } from "lucide-react";
 import { useTripDetail } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
+import { TONE, toneOf } from "@/lib/colors";
 import { StatusBadge } from "@/components/platform/StatusBadge";
 
 interface TripDrawerProps {
@@ -58,9 +59,12 @@ export function TripDrawer({ tripId, onClose }: TripDrawerProps) {
               <div><dt className="text-[11px] uppercase tracking-wider text-text-tertiary">Tenant</dt><dd className="font-medium">{trip.tenant.name}</dd></div>
               <div><dt className="text-[11px] uppercase tracking-wider text-text-tertiary">Customer</dt><dd>{trip.customer ?? "—"}</dd></div>
               <div><dt className="text-[11px] uppercase tracking-wider text-text-tertiary">Pickup</dt><dd>{formatDateTime(trip.pickup_at)}</dd></div>
+              <div><dt className="text-[11px] uppercase tracking-wider text-text-tertiary">Time to allot</dt><dd>{trip.minutes_to_allot === null ? "Not allotted" : trip.minutes_to_allot >= 90 ? `${(trip.minutes_to_allot / 60).toFixed(1)} h` : `${Math.round(trip.minutes_to_allot)} min`}</dd></div>
               <div><dt className="text-[11px] uppercase tracking-wider text-text-tertiary">Airport</dt><dd className="font-mono text-xs">{trip.airport_code || "—"}</dd></div>
               <div><dt className="text-[11px] uppercase tracking-wider text-text-tertiary">RITMO ref</dt><dd className="font-mono text-xs">{trip.ritmo_ref ?? "—"}</dd></div>
               <div><dt className="text-[11px] uppercase tracking-wider text-text-tertiary">Created via</dt><dd>{trip.created_via}</dd></div>
+              <div><dt className="text-[11px] uppercase tracking-wider text-text-tertiary">Passengers</dt><dd className="tabular">{trip.pax_total || "—"}</dd></div>
+              <div><dt className="text-[11px] uppercase tracking-wider text-text-tertiary">Locked price</dt><dd className="font-medium tabular">{trip.price_display ?? "—"}</dd></div>
             </dl>
 
             <section>
@@ -88,13 +92,16 @@ export function TripDrawer({ tripId, onClose }: TripDrawerProps) {
                       <StatusBadge status={v.status} />
                     </div>
                     <p className="text-xs text-text-secondary mt-1">
-                      {[v.vehicle_type, v.plate, v.driver].filter(Boolean).join(" · ") || "No vehicle yet"} · {v.pax_count} pax
+                      {[v.vehicle_type, v.plate, v.driver].filter(Boolean).join(" · ") || "No vehicle yet"} · {v.pax_count} pax{v.price_display ? ` · ${v.price_display}` : ""}
                     </p>
                     {(trip.timeline[v.id] ?? []).length > 0 && (
                       <ol className="mt-3 space-y-1.5 border-t border-ops-line pt-2">
                         {(trip.timeline[v.id] ?? []).map((e, i) => (
                           <li key={i} className="flex items-center justify-between text-xs">
-                            <StatusBadge status={e.status} />
+                            <span className="inline-flex items-center gap-2">
+                              <span className={`h-2 w-2 rounded-full ${TONE[toneOf(e.status)].dot}`} />
+                              <StatusBadge status={e.status} />
+                            </span>
                             <span className="text-text-secondary tabular">{formatDateTime(e.at)}</span>
                           </li>
                         ))}

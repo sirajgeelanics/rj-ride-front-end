@@ -32,6 +32,8 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
     // reflects the actual value, and picking a real one is an explicit act that fires onChange.
     const needsPlaceholder =
       props.value !== undefined && !options.some((o) => o.value === props.value);
+    // A filter that has been set reads as set: tinted navy, so active filters are visible at a glance.
+    const isSet = props.value !== undefined && props.value !== "";
 
     return (
       <div className="w-full">
@@ -39,7 +41,7 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
         <select
           ref={ref}
           id={selectId}
-          className={`w-full h-10 px-3 text-sm bg-white border border-border rounded-lg text-text-primary transition-[border-color,box-shadow] hover:border-[#C2C7CF] focus:outline-none focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue disabled:bg-ops-card2 disabled:text-text-tertiary disabled:cursor-not-allowed ${error ? "border-danger focus:border-danger focus:ring-danger/20" : ""} ${className}`}
+          className={`w-full h-10 pl-3 pr-9 text-sm appearance-none cursor-pointer bg-[length:16px] bg-[right_0.75rem_center] bg-no-repeat bg-[url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23072D62' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'><path d='m6 9 6 6 6-6'/></svg>")] border rounded-lg transition-[border-color,box-shadow,background-color] focus:outline-none ${isSet ? "bg-navy-soft border-brand-blue/50 text-brand-blue font-medium hover:border-brand-blue" : "bg-white border-border text-text-primary hover:border-[#C2C7CF]"} focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue disabled:bg-ops-card2 disabled:text-text-tertiary disabled:cursor-not-allowed ${error ? "border-danger focus:border-danger focus:ring-danger/20" : ""} ${className}`}
           {...props}
         >
           {needsPlaceholder && (

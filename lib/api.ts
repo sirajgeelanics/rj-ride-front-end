@@ -73,6 +73,16 @@ export interface VendorRow {
   drivers: number;
   trips: number;
   live_slots: number;
+  last_trip_at: string | null;
+  vehicles_active: number;
+  vehicles_on_trip: number;
+  vehicles_breakdown: number;
+  vehicles_unavailable: number;
+  vehicles_no_location: number;
+  drivers_available: number;
+  drivers_on_trip: number;
+  drivers_offline: number;
+  drivers_without_login: number;
 }
 
 export interface TenantDetail extends TenantRow {
@@ -89,6 +99,7 @@ export interface TripSlot {
   driver: string | null;
   vehicle_type: string | null;
   pax_count: number;
+  price_display: string | null;
 }
 
 export interface TripRow {
@@ -104,6 +115,8 @@ export interface TripRow {
   ritmo_ref: string | null;
   created_via: string;
   created_at: string;
+  pax_total: number;
+  price_display: string | null;
   vehicles: TripSlot[];
 }
 
@@ -111,6 +124,7 @@ export interface TripPage {
   count: number;
   page: number;
   page_size: number;
+  status_counts: Record<string, number>;
   results: TripRow[];
 }
 
@@ -271,6 +285,7 @@ export interface ActivityTenant {
 }
 
 export interface TripDetail extends TripRow {
+  minutes_to_allot: number | null;
   stops: { sequence: number; kind: string; address: string; location_type: string }[];
   timeline: Record<string, { status: string; at: string }[]>;
 }
@@ -315,3 +330,139 @@ export function tripExportUrl(filters: Record<string, string | undefined>): stri
   const qs = search.toString();
   return `/api/v1/platform/trips/export/${qs ? `?${qs}` : ""}`;
 }
+
+
+// ------------------------------------------------------------------ one vendor's fleet
+
+export interface FleetJob {
+  trip_reference: string;
+  status: string;
+}
+
+export interface VendorVehicle {
+  id: string;
+  plate: string;
+  vehicle_type: string;
+  vehicle_name: string | null;
+  is_active: boolean;
+  airport_code: string;
+  has_tracker: boolean;
+  location_status: string | null;
+  location_updated_at: string | null;
+  current_job: FleetJob | null;
+  documents_expired: number;
+  documents_expiring: number;
+  documents: FleetDocument[];
+}
+
+export interface FleetDocument {
+  doc_type: string;
+  expiry_date: string | null;
+  days_left: number | null;
+}
+
+export interface VendorDriver {
+  id: string;
+  name: string;
+  status: string;
+  is_active: boolean;
+  airport_code: string;
+  has_app_login: boolean;
+  phone_masked: string;
+  current_job: FleetJob | null;
+  documents_expired: number;
+  documents_expiring: number;
+  documents: FleetDocument[];
+}
+
+export interface VendorFleet {
+  vendor: { id: string; name: string; tenant: TenantRef; airport_code: string };
+  summary: {
+    vehicles: number;
+    vehicles_active: number;
+    vehicles_on_trip: number;
+    vehicles_breakdown: number;
+    vehicles_no_location: number;
+    drivers: number;
+    drivers_available: number;
+    drivers_on_trip: number;
+    drivers_offline: number;
+    drivers_without_login: number;
+    documents_expired: number;
+    documents_expiring: number;
+    live_trips: number;
+  };
+  vehicles: VendorVehicle[];
+  drivers: VendorDriver[];
+  truncated: boolean;
+  warning_days: number;
+}
+
+export const useVendorFleet = (id: string) =>
+  useQuery({
+    queryKey: ["platform", "vendor", id],
+    queryFn: () => getJson<VendorFleet>(`/vendors/${id}/`),
+    retry: false,
+    refetchInterval: 30_000,
+  });
+
+
+// ------------------------------------------------------------------ vendor performance
+
+export interface VendorPerformance {
+  window_days: number;
+  grace_minutes: number;
+  assignments: number;
+  completed: number;
+  on_time: { measured: number; on_time: number; rate_pct: number | null; avg_minutes_late: number | null };
+  time_to_allot: { measured: number; avg_minutes: number | null; median_minutes: number | null };
+  utilisation: {
+    window_days: number;
+    vehicles: number;
+    vehicles_used: number;
+    used_pct: number | null;
+    avg_daily_used: number;
+    avg_daily_pct: number | null;
+  };
+  revenue: { currency: string; amount: string; amount_minor: number }[];
+  payouts: {
+    year: number;
+    month: number;
+    status: string;
+    gross: string;
+    operator_fee: string;
+    net: string;
+    paid_at: string | null;
+  }[];
+}
+
+export const useVendorPerformance = (id: string) =>
+  useQuery({
+    queryKey: ["platform", "vendor-performance", id],
+    queryFn: () => getJson<VendorPerformance>(`/vendors/${id}/performance/`),
+    retry: false,
+  });
+
+// ------------------------------------------------------------------ live map
+
+export interface MapPoint {
+  vehicle_id: string;
+  plate: string;
+  vehicle_type: string;
+  vendor: string;
+  tenant: TenantRef;
+  lat: number;
+  lng: number;
+  status: string;
+  last_updated: string;
+  stale: boolean;
+  trip_reference: string | null;
+}
+
+export const useLiveMap = (tenant?: string) =>
+  useQuery({
+    queryKey: ["platform", "map", tenant ?? "all"],
+    queryFn: () => getJson<{ points: MapPoint[]; truncated: boolean }>("/map/", { tenant }),
+    retry: false,
+    refetchInterval: 30_000,
+  });

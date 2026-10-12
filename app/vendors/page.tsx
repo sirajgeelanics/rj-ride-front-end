@@ -4,7 +4,14 @@ import React, { Suspense, useMemo, useState } from "react";
 import Link from "next/link";
 import { Search } from "lucide-react";
 import { useTenants, useVendors } from "@/lib/api";
+import { driverMix, vehicleMix } from "@/lib/mix";
+import { DRIVER_MIX, TONE, VEHICLE_MIX } from "@/lib/colors";
+import { formatDateTime } from "@/lib/format";
 import { Select } from "@/components/ui/Select";
+import { Badge } from "@/components/ui/Badge";
+import { ActionLink } from "@/components/platform/ActionLink";
+import { MixBar } from "@/components/platform/MixBar";
+import { EmptyRow, row, th, thHead } from "@/components/platform/Section";
 
 function VendorsView() {
   const [tenant, setTenant] = useState("");
@@ -38,41 +45,67 @@ function VendorsView() {
             options={[{ value: "", label: "All tenants" }, ...(tenants.data ?? []).map((t) => ({ value: t.id, label: t.name }))]}
           />
         </div>
+        <div className="ml-auto hidden lg:flex items-center gap-3 text-[11px] text-text-secondary">
+          {VEHICLE_MIX.map((m) => (
+            <span key={m.key} className="inline-flex items-center gap-1.5">
+              <span className={`h-2 w-2 rounded-full ${TONE[m.tone].dot}`} />
+              {m.label}
+            </span>
+          ))}
+        </div>
       </div>
 
       <div className="bg-white rounded-2xl border border-border shadow-soft overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="text-left text-[11px] uppercase tracking-wider text-text-tertiary bg-ops-bg/60">
+            <tr className={thHead}>
               <th className="px-5 py-3 font-semibold">Vendor</th>
-              <th className="px-3 py-3 font-semibold">Tenant</th>
-              <th className="px-3 py-3 font-semibold">Airports</th>
-              <th className="px-3 py-3 font-semibold text-right">Vehicles</th>
-              <th className="px-3 py-3 font-semibold text-right">Drivers</th>
-              <th className="px-3 py-3 font-semibold text-right">Trips</th>
-              <th className="px-3 py-3 font-semibold text-right">Live</th>
+              <th className={th}>Tenant</th>
+              <th className={th}>Airports</th>
+              <th className={th}>Vehicles</th>
+              <th className={th}>Drivers</th>
+              <th className={`${th} text-right`}>Trips</th>
+              <th className={`${th} text-right`}>Live</th>
+              <th className={th}>Last trip</th>
               <th className="px-5 py-3" />
             </tr>
           </thead>
           <tbody>
             {rows.map((v) => (
-              <tr key={v.id} className="border-t border-ops-line hover:bg-ops-bg/60 transition-colors">
-                <td className="px-5 py-3 font-medium text-text-primary">{v.name}</td>
+              <tr key={v.id} className={`${row} ${v.vehicles_breakdown > 0 ? TONE.red.row : ""}`}>
+                <td className="px-5 py-3">
+                  <Link href={`/vendors/${v.id}`} className="font-medium text-text-primary hover:underline">{v.name}</Link>
+                  {v.drivers_without_login > 0 && (
+                    <span className="ml-2"><Badge variant="amber">{v.drivers_without_login} no login</Badge></span>
+                  )}
+                </td>
                 <td className="px-3 py-3">
                   <Link href={`/tenants/${v.tenant.id}`} className="hover:underline">{v.tenant.name}</Link>
                 </td>
                 <td className="px-3 py-3 font-mono text-xs">{v.airport_code || "—"}</td>
-                <td className="px-3 py-3 text-right tabular">{v.vehicles}</td>
-                <td className="px-3 py-3 text-right tabular">{v.drivers}</td>
+                <td className="px-3 py-3">
+                  <div className="text-xs font-semibold tabular text-text-primary mb-1">{v.vehicles}</div>
+                  <MixBar segments={vehicleMix(v)} empty="No vehicles" />
+                </td>
+                <td className="px-3 py-3">
+                  <div className="text-xs font-semibold tabular text-text-primary mb-1">{v.drivers}</div>
+                  <MixBar segments={driverMix(v)} empty="No drivers" />
+                </td>
                 <td className="px-3 py-3 text-right tabular">{v.trips}</td>
-                <td className="px-3 py-3 text-right tabular">{v.live_slots}</td>
-                <td className="px-5 py-3 text-right">
-                  <Link href={`/trips?tenant=${v.tenant.id}&vendor=${v.id}`} className="text-brand-blue font-medium hover:underline">Trips</Link>
+                <td className="px-3 py-3 text-right tabular">
+                  {v.live_slots ? <Badge variant="blue">{v.live_slots}</Badge> : <span className="text-text-tertiary">0</span>}
+                </td>
+                <td className="px-3 py-3 text-text-secondary whitespace-nowrap">{formatDateTime(v.last_trip_at)}</td>
+                <td className="px-5 py-3 text-right whitespace-nowrap">
+                  <span className="inline-flex gap-2">
+                    <ActionLink href={`/vendors/${v.id}`} tone="navy">Fleet</ActionLink>
+                    <ActionLink href={`/trips?tenant=${v.tenant.id}&vendor=${v.id}`} tone="gold">Trips</ActionLink>
+                  </span>
                 </td>
               </tr>
             ))}
             {!vendors.isLoading && rows.length === 0 && (
-              <tr><td colSpan={8} className="px-5 py-10 text-center text-text-secondary">No vendors match.</td></tr>
+              <EmptyRow cols={9} text="No vendors match." />
             )}
           </tbody>
         </table>

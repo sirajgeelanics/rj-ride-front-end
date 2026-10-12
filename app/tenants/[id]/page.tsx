@@ -1,9 +1,11 @@
 "use client";
 
 import React, { use, useState } from "react";
+import { ChevronDown } from "lucide-react";
 import Link from "next/link";
 import { ArrowLeft, CarFront, Route, Truck, Users } from "lucide-react";
 import {
+  useVendorFleet,
   useActivity,
   useAttention,
   useConfigGaps,
@@ -15,6 +17,10 @@ import {
 } from "@/lib/api";
 import { CATEGORIES } from "@/components/platform/attentionCategories";
 import { Badge } from "@/components/ui/Badge";
+import { DriverTable, VehicleTable } from "@/components/platform/FleetTables";
+import { ActionLink } from "@/components/platform/ActionLink";
+import { MixBar } from "@/components/platform/MixBar";
+import { driverMix, vehicleMix } from "@/lib/mix";
 import { StatCard } from "@/components/platform/StatCard";
 import { StatusBadge } from "@/components/platform/StatusBadge";
 import { formatDateTime } from "@/lib/format";
@@ -31,9 +37,37 @@ const TABS: { key: Tab; label: string }[] = [
 
 const card = "bg-white rounded-2xl border border-border shadow-soft overflow-x-auto";
 
+/** One vendor's vehicles and drivers, loaded when its section is opened. */
+function VendorFleetInline({ vendorId }: { vendorId: string }) {
+  const { data, isLoading, error } = useVendorFleet(vendorId);
+  if (isLoading) return <p className="px-5 py-4 text-sm text-text-secondary">Loading…</p>;
+  if (error || !data) return <p className="px-5 py-4 text-sm text-danger">Could not load this vendor.</p>;
+  return (
+    <div className="space-y-5 pb-4">
+      <div>
+        <h4 className="px-5 pt-4 pb-2 text-[11px] uppercase tracking-wider font-semibold text-text-tertiary">
+          Vehicles ({data.summary.vehicles})
+        </h4>
+        <div className="overflow-x-auto">
+          <VehicleTable vehicles={data.vehicles} emptyText="No vehicles." />
+        </div>
+      </div>
+      <div>
+        <h4 className="px-5 pb-2 text-[11px] uppercase tracking-wider font-semibold text-text-tertiary">
+          Drivers ({data.summary.drivers})
+        </h4>
+        <div className="overflow-x-auto">
+          <DriverTable drivers={data.drivers} emptyText="No drivers." />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function TenantDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const [tab, setTab] = useState<Tab>("overview");
+  const [openVendors, setOpenVendors] = useState<Record<string, boolean>>({});
   const tenant = useTenant(id);
   const trips = useTrips({ tenant: id, page_size: 10 });
   const fleet = useFleet(id, { enabled: tab === "fleet" || tab === "overview" });
@@ -67,10 +101,10 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
       </div>
 
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
-        <StatCard label="Vendors" value={t.vendors} icon={Truck} />
-        <StatCard label="Vehicles" value={t.vehicles} icon={CarFront} />
-        <StatCard label="Drivers" value={t.drivers} icon={Users} />
-        <StatCard label="Trips" value={t.trips} icon={Route} hint={`${t.open_trips} open`} />
+        <StatCard tone="navy" label="Vendors" value={t.vendors} icon={Truck} />
+        <StatCard tone="green" label="Vehicles" value={t.vehicles} icon={CarFront} />
+        <StatCard tone="blue" label="Drivers" value={t.drivers} icon={Users} />
+        <StatCard tone="purple" label="Trips" value={t.trips} icon={Route} hint={`${t.open_trips} open`} />
       </div>
 
       <div className="flex gap-1 border-b border-border overflow-x-auto">
@@ -147,8 +181,8 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
               <tr className="text-left text-[11px] uppercase tracking-wider text-text-tertiary bg-ops-bg/60">
                 <th className="px-5 py-3 font-semibold">Vendor</th>
                 <th className="px-3 py-3 font-semibold">Airports</th>
-                <th className="px-3 py-3 font-semibold text-right">Vehicles</th>
-                <th className="px-3 py-3 font-semibold text-right">Drivers</th>
+                <th className="px-3 py-3 font-semibold">Vehicles</th>
+                <th className="px-3 py-3 font-semibold">Drivers</th>
                 <th className="px-3 py-3 font-semibold text-right">Trips</th>
                 <th className="px-3 py-3 font-semibold text-right">Live</th>
                 <th className="px-5 py-3" />
@@ -157,14 +191,25 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
             <tbody>
               {t.vendor_list.map((v) => (
                 <tr key={v.id} className="border-t border-ops-line hover:bg-ops-bg/60 transition-colors">
-                  <td className="px-5 py-3 font-medium text-text-primary">{v.name}</td>
+                  <td className="px-5 py-3">
+                    <Link href={`/vendors/${v.id}`} className="font-medium text-text-primary hover:underline">{v.name}</Link>
+                  </td>
                   <td className="px-3 py-3 font-mono text-xs">{v.airport_code || "—"}</td>
-                  <td className="px-3 py-3 text-right tabular">{v.vehicles}</td>
-                  <td className="px-3 py-3 text-right tabular">{v.drivers}</td>
+                  <td className="px-3 py-3">
+                    <div className="text-xs font-semibold tabular text-text-primary mb-1">{v.vehicles}</div>
+                    <MixBar segments={vehicleMix(v)} empty="No vehicles" />
+                  </td>
+                  <td className="px-3 py-3">
+                    <div className="text-xs font-semibold tabular text-text-primary mb-1">{v.drivers}</div>
+                    <MixBar segments={driverMix(v)} empty="No drivers" />
+                  </td>
                   <td className="px-3 py-3 text-right tabular">{v.trips}</td>
                   <td className="px-3 py-3 text-right tabular">{v.live_slots}</td>
                   <td className="px-5 py-3 text-right">
-                    <Link href={`/trips?tenant=${t.id}&vendor=${v.id}`} className="text-brand-blue font-medium hover:underline">Trips</Link>
+                    <span className="inline-flex gap-2">
+                      <ActionLink href={`/vendors/${v.id}`} tone="navy">Fleet</ActionLink>
+                      <ActionLink href={`/trips?tenant=${t.id}&vendor=${v.id}`} tone="gold">Trips</ActionLink>
+                    </span>
                   </td>
                 </tr>
               ))}
@@ -200,29 +245,49 @@ export default function TenantDetailPage({ params }: { params: Promise<{ id: str
       )}
 
       {tab === "fleet" && (
-        <div className="grid md:grid-cols-2 gap-4">
-          <div className={`${card} p-5`}>
-            <h3 className="font-serif text-lg font-medium mb-3">Vehicles</h3>
-            <dl className="space-y-2 text-sm">
-              {[
-                ["Total", f?.vehicles], ["Active", f?.vehicles_active], ["On trip", f?.vehicles_on_trip],
-                ["Breakdown", f?.vehicles_breakdown], ["Unavailable", f?.vehicles_unavailable], ["No location", f?.vehicles_no_location],
-              ].map(([label, v]) => (
-                <div key={String(label)} className="flex justify-between"><dt className="text-text-secondary">{label}</dt><dd className="tabular">{v ?? "—"}</dd></div>
-              ))}
-            </dl>
+        <div className="space-y-4">
+          <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-3">
+            <StatCard tone="green" label="Vehicles" value={f?.vehicles ?? "—"} icon={CarFront} hint={f ? `${f.vehicles_active} active · ${f.vehicles_on_trip} on trip` : undefined} />
+            <StatCard tone="blue" label="Drivers" value={f?.drivers ?? "—"} icon={Users} hint={f ? `${f.drivers_available} available · ${f.drivers_on_trip} on trip` : undefined} />
+            <StatCard tone={f && f.vehicles_breakdown > 0 ? "red" : "grey"} label="Breakdown" value={f?.vehicles_breakdown ?? "—"} icon={Truck} hint={f ? `${f.vehicles_no_location} with no location` : undefined} />
+            <StatCard tone={f && f.documents_expired > 0 ? "red" : f && f.documents_expiring > 0 ? "amber" : "green"} label="Documents" value={f ? f.documents_expired + f.documents_expiring : "—"} icon={Route} hint={f ? `${f.documents_expired} expired · ${f.documents_expiring} soon` : undefined} />
           </div>
-          <div className={`${card} p-5`}>
-            <h3 className="font-serif text-lg font-medium mb-3">Drivers and documents</h3>
-            <dl className="space-y-2 text-sm">
-              {[
-                ["Drivers", f?.drivers], ["Available", f?.drivers_available], ["On trip", f?.drivers_on_trip],
-                ["Offline", f?.drivers_offline], ["Documents expired", f?.documents_expired], ["Documents expiring soon", f?.documents_expiring],
-              ].map(([label, v]) => (
-                <div key={String(label)} className="flex justify-between"><dt className="text-text-secondary">{label}</dt><dd className="tabular">{v ?? "—"}</dd></div>
-              ))}
-            </dl>
-          </div>
+
+          <h3 className="font-serif text-xl font-medium text-text-primary">By vendor</h3>
+          {t.vendor_list.length === 0 && (
+            <p className="text-sm text-text-secondary">This tenant has no vendors yet.</p>
+          )}
+          {[...t.vendor_list]
+            .sort((a, b) => b.vehicles + b.drivers - (a.vehicles + a.drivers) || a.name.localeCompare(b.name))
+            .map((v, index) => {
+            // Vendors with a fleet come first; the first one opens so the tab is never a wall of closed rows.
+            const isOpen = openVendors[v.id] ?? index === 0;
+            return (
+              <section key={v.id} className="bg-white rounded-2xl border border-border shadow-soft overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setOpenVendors((prev) => ({ ...prev, [v.id]: !isOpen }))}
+                  aria-expanded={isOpen}
+                  className="w-full flex flex-wrap items-center gap-x-6 gap-y-1 px-5 py-4 text-left hover:bg-ops-bg/60 transition-colors"
+                >
+                  <ChevronDown className={`w-4 h-4 text-text-tertiary transition-transform ${isOpen ? "" : "-rotate-90"}`} />
+                  <span className="font-medium text-text-primary">{v.name}</span>
+                  {v.airport_code && <span className="font-mono text-xs px-2 py-0.5 rounded-md bg-ops-card2">{v.airport_code}</span>}
+                  <span className="hidden md:block w-44"><MixBar segments={vehicleMix(v)} empty="" /></span>
+                  <span className="ml-auto flex gap-5 text-sm text-text-secondary">
+                    <span><span className="tabular font-medium text-text-primary">{v.vehicles}</span> vehicles</span>
+                    <span><span className="tabular font-medium text-text-primary">{v.drivers}</span> drivers</span>
+                    <span><span className="tabular font-medium text-text-primary">{v.live_slots}</span> live</span>
+                  </span>
+                </button>
+                {isOpen && (
+                  <div className="border-t border-ops-line">
+                    <VendorFleetInline vendorId={v.id} />
+                  </div>
+                )}
+              </section>
+            );
+          })}
         </div>
       )}
 
