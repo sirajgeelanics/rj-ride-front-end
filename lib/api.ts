@@ -313,6 +313,47 @@ export const useMoney = (tenant?: string, opts?: Opts) =>
 export const useFleet = (tenant?: string, opts?: Opts) =>
   useQuery(insightQuery<Fleet>("fleet", "/fleet/", tenant, opts));
 
+export interface CatalogRateCard {
+  id: string;
+  basis: string;
+  basis_label: string;
+  rates: { label: string; value: string }[];
+  currency: string;
+  version: number;
+  versions: number;
+  valid_from: string;
+  valid_to: string | null;
+  status: "ACTIVE" | "UPCOMING" | "EXPIRED" | "INACTIVE" | "SUPERSEDED";
+  free_cancellation_hours: number;
+  min_lead_time_hours: number;
+  modifiers: Record<string, unknown>;
+}
+
+export interface CatalogVehicleType {
+  id: string;
+  name: string;
+  ac: boolean;
+  capacity: number;
+  vehicles: number;
+  rate_card: CatalogRateCard | null;
+  names: { id: string; name: string; vehicles: number }[];
+}
+
+export interface CatalogVendor {
+  id: string;
+  name: string;
+  airport_code: string;
+  vehicle_types: CatalogVehicleType[];
+}
+
+export interface CatalogTenant {
+  tenant: TenantRef;
+  vendors: CatalogVendor[];
+}
+
+export const useCatalog = (tenant?: string, opts?: Opts) =>
+  useQuery(insightQuery<{ tenants: CatalogTenant[] }>("catalog", "/catalog/", tenant, opts));
+
 export const useActivity = (tenant?: string, opts?: { enabled?: boolean }) =>
   useQuery(insightQuery<{ tenants: ActivityTenant[] }>("activity", "/activity/", tenant, opts));
 
