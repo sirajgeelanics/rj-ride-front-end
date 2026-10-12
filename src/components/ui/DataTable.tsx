@@ -1,0 +1,166 @@
+import React, { useState, useMemo } from "react";
+import { ChevronUp, ChevronDown, ChevronsLeft, ChevronsRight, Inbox } from "lucide-react";
+import { Button } from "./Button";
+
+export interface Column {
+  key: string;
+  header: string;
+  sortable?: boolean;
+  render?: (value: unknown, row: Record<string, unknown>) => React.ReactNode;
+}
+
+interface DataTableProps {
+  columns: Column[];
+  data: Record<string, unknown>[];
+  pageSize?: number;
+  emptyMessage?: string;
+}
+
+type SortDirection = "asc" | "desc" | null;
+
+export const DataTable = React.forwardRef<HTMLDivElement, DataTableProps>(
+  ({ columns, data, pageSize = 10, emptyMessage = "No data available" }, ref) => {
+    const [sortKey, setSortKey] = useState<string | null>(null);
+    const [sortDirection, setSortDirection] = useState<SortDirection>(null);
+    const [page, setPage] = useState(0);
+
+    const sortedData = useMemo(() => {
+      if (!sortKey || !sortDirection) return data;
+      const sorted = [...data].sort((a, b) => {
+        const aVal = a[sortKey];
+        const bVal = b[sortKey];
+        if (aVal === undefined || aVal === null || bVal === undefined || bVal === null) return 0;
+        if (aVal < bVal) return sortDirection === "asc" ? -1 : 1;
+        if (aVal > bVal) return sortDirection === "asc" ? 1 : -1;
+        return 0;
+      });
+      return sorted;
+    }, [data, sortKey, sortDirection]);
+
+    const paginatedData = useMemo(() => {
+      const start = page * pageSize;
+      return sortedData.slice(start, start + pageSize);
+    }, [sortedData, page, pageSize]);
+
+    const totalPages = Math.ceil(sortedData.length / pageSize);
+
+    const handleSort = (key: string) => {
+      if (sortKey === key) {
+        if (sortDirection === "asc") {
+          setSortDirection("desc");
+        } else if (sortDirection === "desc") {
+          setSortKey(null);
+          setSortDirection(null);
+        }
+      } else {
+        setSortKey(key);
+        setSortDirection("asc");
+        setPage(0);
+      }
+    };
+
+    if (data.length === 0) {
+      return (
+        <div ref={ref} className="flex flex-col items-center gap-2 py-12 text-center text-text-secondary border border-dashed border-border rounded-2xl bg-white animate-fade-in">
+          <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-ops-card2 text-text-tertiary">
+            <Inbox className="w-5 h-5" />
+          </span>
+          <p className="text-sm font-medium">{emptyMessage}</p>
+        </div>
+      );
+    }
+
+    return (
+      <div ref={ref} className="flex flex-col gap-4">
+        <div className="overflow-auto max-h-[70vh] border border-border rounded-2xl bg-white shadow-soft custom-scrollbar">
+          <table className="w-full text-sm">
+            <thead className="sticky top-0 z-10 bg-ops-card2 border-b border-border">
+              <tr>
+                {columns.map((col) => (
+                  <th
+                    key={col.key}
+                    className={`px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-text-secondary transition-colors select-none ${
+                      col.sortable ? "cursor-pointer hover:text-text-primary" : ""
+                    }`}
+                    aria-sort={
+                      col.sortable && sortKey === col.key
+                        ? sortDirection === "asc" ? "ascending" : "descending"
+                        : undefined
+                    }
+                    onClick={() => col.sortable && handleSort(col.key)}
+                  >
+                    <div className="flex items-center gap-2">
+                      {col.header}
+                      {col.sortable && sortKey === col.key && (
+                        sortDirection === "asc" ? (
+                          <ChevronUp className="w-3.5 h-3.5 text-accent-gold" />
+                        ) : (
+                          <ChevronDown className="w-3.5 h-3.5 text-accent-gold" />
+                        )
+                      )}
+                    </div>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {paginatedData.map((row, idx) => (
+                <tr key={idx} className="bg-white border-b border-ops-line last:border-b-0 hover:bg-ops-bg transition-colors">
+                  {columns.map((col) => (
+                    <td key={col.key} className="px-4 py-3.5 text-text-primary">
+                      {col.render ? col.render(row[col.key], row) : String(row[col.key] ?? "-")}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {totalPages > 1 && (
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <p className="text-xs text-text-secondary tabular-nums">
+              Page {page + 1} of {totalPages}
+            </p>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => setPage(0)}
+                disabled={page === 0}
+              >
+                <ChevronsLeft className="w-4 h-4" />
+              </Button>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => setPage(Math.max(0, page - 1))}
+                disabled={page === 0}
+              >
+                Prev
+              </Button>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => setPage(Math.min(totalPages - 1, page + 1))}
+                disabled={page >= totalPages - 1}
+              >
+                Next
+              </Button>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => setPage(totalPages - 1)}
+                disabled={page >= totalPages - 1}
+              >
+                <ChevronsRight className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+);
+
+DataTable.displayName = "DataTable";

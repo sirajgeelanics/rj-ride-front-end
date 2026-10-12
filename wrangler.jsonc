@@ -1,0 +1,7 @@
+{
+  "name": "ride-super-admin",
+  "main": "worker/index.ts",
+  "compatibility_date": "2025-01-01",
+  "assets": { "directory": "./dist", "binding": "ASSETS", "not_found_handling": "single-page-application" },
+  "vars": { "API_ORIGIN": "https://api-ravani.rezolv.app" }
+}
