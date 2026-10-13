@@ -6,8 +6,9 @@
   "scripts": {
     "dev": "vite --port 3003 --host",
     "build": "tsc --noEmit && vite build",
-    "preview": "vite preview --port 3003",
-    "typecheck": "tsc --noEmit"
+    "preview": "npm run build && wrangler dev",
+    "typecheck": "tsc --noEmit",
+    "deploy": "npm run build && wrangler deploy"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.62.0",
@@ -26,6 +27,7 @@
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.3.4",
     "typescript": "^5.0.0",
-    "vite": "^6.0.0"
+    "vite": "^6.0.0",
+    "wrangler": "^4.121.0"
   }
 }
