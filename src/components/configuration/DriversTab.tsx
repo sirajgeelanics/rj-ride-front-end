@@ -1,0 +1,504 @@
+import React, { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useLanguageStore, t, apiClient, keys, QueryBoundary, isApiError } from "@/lib/shared";
+import { fetchAllPages } from "@/hooks/useCursorPagination";
+import type { components } from "@/lib/shared/api/schema.d";
+import { Button } from "@/components/ui/Button";
+import { DataTable, Column } from "@/components/ui/DataTable";
+import { Drawer } from "@/components/ui/Drawer";
+import { Modal } from "@/components/ui/Modal";
+import { Input } from "@/components/ui/Input";
+import { FormField } from "@/components/ui/FormField";
+import { Select } from "@/components/ui/Select";
+import { SearchableSelect } from "@/components/ui/SearchableSelect";
+import { Badge } from "@/components/ui/Badge";
+import { PII } from "@/components/ui/PII";
+import { HealthStrip } from "@/components/configuration/HealthStrip";
+import { DriverLoginPanel } from "@/components/configuration/DriverLoginPanel";
+import { MultiSelectFilter } from "@/components/ui/MultiSelectFilter";
+import { useToastStore } from "@/stores/toastStore";
+import { splitAirportCodes } from "@/lib/airportCodes";
+
+type ApiDriver = components["schemas"]["Driver"];
+type PatchedDriver = components["schemas"]["PatchedDriver"];
+// airport_code is served by the API but missing from the generated Vendor schema (stale since the
+// city -> airport_code rename).
+type ApiVendor = components["schemas"]["Vendor"] & { airport_code?: string | null };
+
+interface DriverFormState {
+  vendor: string;
+  name: string;
+  phone: string;
+  licence_number: string;
+  status: string;
+  // Only meaningful (and only shown) when the vendor operates at more than one airport.
+  airport_code: string;
+  is_active: boolean;
+  // Create-only: optionally provision the driver's mobile-app login in the same step (mirrors
+  // DriverLoginPanel's own create form). Both blank on edit — logins on an existing driver are
+  // managed via DriverLoginPanel instead.
+  email: string;
+  password: string;
+}
+
+const STATUS_OPTIONS = [
+  { value: "AVAILABLE", label: "Available" },
+  { value: "ON_TRIP", label: "On trip" },
+  { value: "OFFLINE", label: "Offline" },
+];
+
+interface DriversTabProps {
+  searchQuery?: string;
+}
+
+export const DriversTab: React.FC<DriversTabProps> = ({ searchQuery = "" }) => {
+  const language = useLanguageStore((s) => s.language);
+  const addToast = useToastStore((s) => s.addToast);
+  const queryClient = useQueryClient();
+
+  // Vendor ids to narrow the roster to. Empty = no filter (show every vendor's drivers).
+  const [vendorFilter, setVendorFilter] = useState<string[]>([]);
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: keys.fleet.drivers.list({ vendor_in: vendorFilter.join(",") }),
+    queryFn: async () => {
+      // Server-side via ?vendor_in=<id>,<id> — the list is cursor-paginated, so filtering in
+      // the browser would only ever search the rows already fetched.
+      const qs = vendorFilter.length ? `?vendor_in=${vendorFilter.join(",")}` : "";
+      // Follow every cursor page so all drivers load — not just the first 25.
+      return { results: await fetchAllPages<ApiDriver>(`/api/v1/fleet/drivers/${qs}`) };
+    },
+    // Always load current rows: a driver edited/deactivated elsewhere would otherwise linger and
+    // 404 on edit/deactivate with "resource does not exist".
+    refetchOnMount: "always",
+  });
+
+  const isMissing = (err: unknown) => isApiError(err) && err.status === 404;
+  const refreshDrivers = () =>
+    void queryClient.invalidateQueries({ queryKey: keys.fleet.drivers.list() });
+
+  // Agency admins may file a driver under any vendor, so list them all for the dropdown.
+  const { data: vendorsData } = useQuery({
+    queryKey: keys.config.vendors.list(),
+    queryFn: async () => {
+      // All vendors — the filter dropdown must list every vendor, not the first 25.
+      return { results: await fetchAllPages<ApiVendor>("/api/v1/config/vendors/") };
+    },
+  });
+  const vendors = (vendorsData?.results ?? []) as ApiVendor[];
+  const vendorFilterOptions = vendors.map((v) => ({ value: v.id, label: v.name }));
+
+  const allDrivers: ApiDriver[] = (data as { results?: ApiDriver[] } | undefined)?.results ?? (data as ApiDriver[] | undefined) ?? [];
+  const drivers = searchQuery.trim()
+    ? allDrivers.filter(
+        (d) =>
+          d.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          d.phone.includes(searchQuery)
+      )
+    : allDrivers;
+
+  const createMutation = useMutation({
+    mutationFn: async (input: Record<string, unknown>) => {
+      const { data: res, error: err } = await apiClient.POST("/v1/fleet/drivers", { body: input as unknown as ApiDriver });
+      if (err) throw err;
+      return res;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: keys.fleet.drivers.list() });
+      addToast("Driver created", "success");
+      setDrawerOpen(false);
+    },
+    onError: (err: unknown) => {
+      addToast(err instanceof Error ? err.message : "Failed to create driver", "error");
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, input }: { id: string; input: Record<string, unknown> }) => {
+      const { data: res, error: err } = await apiClient.PATCH("/v1/fleet/drivers/{id}", {
+        params: { path: { id } },
+        body: input as unknown as PatchedDriver,
+      });
+      if (err) throw err;
+      return res;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: keys.fleet.drivers.list() });
+      addToast("Driver updated", "success");
+      setDrawerOpen(false);
+    },
+    onError: (err: unknown) => {
+      if (isMissing(err)) {
+        refreshDrivers();
+        setDrawerOpen(false);
+        addToast("This driver no longer exists — the list has been refreshed.", "error");
+        return;
+      }
+      addToast(isApiError(err) ? err.message : err instanceof Error ? err.message : "Failed to update driver", "error");
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error: err } = await apiClient.DELETE("/v1/fleet/drivers/{id}", { params: { path: { id } } });
+      if (err) throw err;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: keys.fleet.drivers.list() });
+      addToast("Driver deactivated", "success");
+      setConfirmTarget(null);
+    },
+    onError: (err: unknown) => {
+      setConfirmTarget(null);
+      if (isMissing(err)) {
+        refreshDrivers();
+        addToast("This driver no longer exists — the list has been refreshed.", "error");
+        return;
+      }
+      addToast(isApiError(err) ? err.message : err instanceof Error ? err.message : "Failed to deactivate driver", "error");
+    },
+  });
+
+  // Deactivation asks for confirmation first (it removes the driver from the roster).
+  const [confirmTarget, setConfirmTarget] = useState<{ id: string; label: string } | null>(null);
+
+  const emptyForm: DriverFormState = { vendor: "", name: "", phone: "", licence_number: "", status: "AVAILABLE", airport_code: "", is_active: true, email: "", password: "" };
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [formData, setFormData] = useState<DriverFormState>(emptyForm);
+
+  const openCreate = () => {
+    setEditingId(null);
+    setFormData(emptyForm);
+    setDrawerOpen(true);
+  };
+
+  const openEdit = (driver: ApiDriver) => {
+    setEditingId(driver.id);
+    // phone & licence_number arrive PII-masked on read, so we never pre-fill them — the
+    // user leaves them blank to keep the stored value (partial PATCH) or retypes to change.
+    setFormData({
+      vendor: driver.vendor,
+      name: driver.name,
+      phone: "",
+      licence_number: "",
+      status: driver.status ?? "AVAILABLE",
+      airport_code: driver.airport_code ?? "",
+      is_active: driver.is_active,
+      email: "",
+      password: "",
+    });
+    setDrawerOpen(true);
+  };
+
+  const selectedVendor = vendors.find((v) => v.id === formData.vendor);
+  const vendorAirportCodes = splitAirportCodes(selectedVendor?.airport_code);
+  const showAirport = vendorAirportCodes.length > 1;
+  const airportOptions = vendorAirportCodes.map((c) => ({ value: c, label: c }));
+
+  const handleSave = () => {
+    if (!formData.vendor || !formData.name.trim()) {
+      addToast("Vendor and name are required", "error");
+      return;
+    }
+    if (showAirport && !editingId && !formData.airport_code) {
+      addToast("Select the airport this driver operates from", "error");
+      return;
+    }
+    if (editingId) {
+      // Partial update: only send PII fields when the user actually retyped them.
+      const input: Record<string, unknown> = {
+        vendor: formData.vendor,
+        name: formData.name.trim(),
+        status: formData.status,
+        airport_code: showAirport ? formData.airport_code : "",
+        is_active: formData.is_active,
+      };
+      if (formData.phone.trim()) input.phone = formData.phone.trim();
+      if (formData.licence_number.trim()) input.licence_number = formData.licence_number.trim();
+      updateMutation.mutate({ id: editingId, input });
+      return;
+    }
+    if (!formData.phone.trim() || !formData.licence_number.trim()) {
+      addToast("Phone and licence number are required", "error");
+      return;
+    }
+    const loginEmail = formData.email.trim();
+    const loginPassword = formData.password.trim();
+    if (loginEmail && loginPassword.length < 12) {
+      addToast("A driver-login password is required (min 12 characters) once an email is set", "error");
+      return;
+    }
+    createMutation.mutate({
+      vendor: formData.vendor,
+      name: formData.name.trim(),
+      phone: formData.phone.trim(),
+      licence_number: formData.licence_number.trim(),
+      status: formData.status,
+      airport_code: showAirport ? formData.airport_code : "",
+      is_active: formData.is_active,
+      // Optional: provisions a mobile-app login in the same step, with the password the ops
+      // user chose here — never auto-generated. Omitted entirely when blank (no login created).
+      ...(loginEmail ? { email: loginEmail, password: loginPassword } : {}),
+    });
+  };
+
+  const vendorOptions = [
+    { value: "", label: "Select vendor…" },
+    ...vendors.map((v) => ({ value: v.id, label: v.name })),
+  ];
+
+  const columns: Column[] = [
+    {
+      key: "name",
+      header: t("driverName", language),
+      sortable: true,
+      render: (val): React.ReactNode => <PII value={val as string} type="name" />,
+    },
+    {
+      key: "phone",
+      header: t("phone", language),
+      render: (val): React.ReactNode => <PII value={val as string} type="phone" />,
+    },
+    {
+      key: "airport_code",
+      header: "Airport",
+      render: (val, row): React.ReactNode => {
+        if (val) return val as string;
+        const owner = vendors.find((v) => v.id === (row as Record<string, unknown>).vendor);
+        return splitAirportCodes(owner?.airport_code).join(", ") || t("dash", language);
+      },
+    },
+    {
+      key: "status",
+      header: t("status", language),
+      render: (val): React.ReactNode => (
+        <Badge variant={val === "AVAILABLE" ? "green" : val === "ON_TRIP" ? "blue" : "red"}>
+          {val as string}
+        </Badge>
+      ),
+    },
+    {
+      key: "is_active",
+      header: "Active",
+      render: (val): React.ReactNode => (
+        <Badge variant={val ? "green" : "red"}>
+          {val ? t("active", language) : t("inactive", language)}
+        </Badge>
+      ),
+    },
+    {
+      key: "actions",
+      header: "Actions",
+      render: (_, row): React.ReactNode => {
+        const driver = row as unknown as ApiDriver;
+        return (
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="ghost"
+              className="hover:bg-brand-wine/10! hover:text-brand-wine!"
+              onClick={() => openEdit(driver)}
+            >
+              {t("edit", language)}
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="hover:bg-danger/10! hover:text-danger!"
+              onClick={() => setConfirmTarget({ id: driver.id, label: driver.name })}
+            >
+              {t("deactivate", language)}
+            </Button>
+          </div>
+        );
+      },
+    },
+  ];
+
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <h3 className="font-semibold text-ops-sidebar">
+          {t("drivers", language)} ({drivers.length})
+        </h3>
+        <div className="flex items-center gap-2">
+          <Button onClick={openCreate} variant="primary" size="sm">
+            New Driver
+          </Button>
+        </div>
+      </div>
+
+      <HealthStrip expiredCount={0} expiringCount={0} />
+
+      {/* Narrow the roster to one or more vendors — filtered server-side, so it spans every
+          driver rather than just the current page. */}
+      <div className="w-72">
+        <MultiSelectFilter
+          options={vendorFilterOptions}
+          selected={vendorFilter}
+          onChange={setVendorFilter}
+          placeholder="All vendors"
+          searchPlaceholder="Search vendors…"
+        />
+      </div>
+
+      <QueryBoundary
+        isLoading={isLoading}
+        error={error}
+        isEmpty={drivers.length === 0}
+        emptyFallback={<p className="text-sm text-text-secondary py-4">{t("noDrivers", language)}</p>}
+      >
+        <DataTable
+          columns={columns}
+          data={drivers as unknown as Record<string, unknown>[]}
+          pageSize={10}
+          emptyMessage={t("noDrivers", language)}
+        />
+      </QueryBoundary>
+
+      <Drawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        title={editingId ? "Edit Driver" : "New Driver"}
+        width="md"
+      >
+        <div className="space-y-4">
+          <FormField label="Vendor" required>
+            <SearchableSelect
+              options={vendorOptions.filter((o) => o.value)}
+              value={formData.vendor}
+              onChange={(val) => setFormData({ ...formData, vendor: val, airport_code: "" })}
+              placeholder="Search vendor…"
+            />
+          </FormField>
+
+          {showAirport && (
+            <FormField label="Airport" required={!editingId}>
+              <SearchableSelect
+                options={airportOptions}
+                value={formData.airport_code}
+                onChange={(val) => setFormData({ ...formData, airport_code: val })}
+                placeholder="Select airport…"
+              />
+              <p className="text-xs text-text-secondary mt-1">
+                This vendor operates at several airports — pick where this driver works from.
+              </p>
+            </FormField>
+          )}
+
+          <FormField label={t("driverName", language)} required>
+            <Input
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              placeholder="Full name"
+            />
+          </FormField>
+
+          <FormField label={t("phone", language)} required={!editingId}>
+            <Input
+              value={formData.phone}
+              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+              placeholder={editingId ? "Leave blank to keep current" : "+91 98765 43210"}
+            />
+          </FormField>
+
+          <FormField label="Licence Number" required={!editingId}>
+            <Input
+              value={formData.licence_number}
+              onChange={(e) => setFormData({ ...formData, licence_number: e.target.value })}
+              placeholder={editingId ? "Leave blank to keep current" : "e.g., KA0120210001234"}
+            />
+          </FormField>
+
+          <FormField label={t("status", language)}>
+            <Select
+              options={STATUS_OPTIONS}
+              value={formData.status}
+              onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+            />
+          </FormField>
+
+          {!editingId && (
+            <>
+              <FormField label="Driver app login email">
+                <Input
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  placeholder="Optional — leave blank to set up a login later"
+                />
+              </FormField>
+
+              {formData.email.trim() && (
+                <FormField label="Driver app login password" required>
+                  <Input
+                    type="password"
+                    value={formData.password}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    placeholder="Min 12 characters — this is the final password"
+                    autoComplete="new-password"
+                  />
+                </FormField>
+              )}
+            </>
+          )}
+
+          {editingId && <DriverLoginPanel driverId={editingId} driverName={formData.name} />}
+
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="driver-active"
+              checked={formData.is_active}
+              onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
+              className="w-4 h-4"
+            />
+            <label htmlFor="driver-active" className="text-sm text-ops-sidebar">
+              Active
+            </label>
+          </div>
+
+          <div className="flex gap-2 pt-4">
+            <Button
+              onClick={handleSave}
+              variant="primary"
+              disabled={createMutation.isPending || updateMutation.isPending}
+            >
+              {editingId ? "Update" : "Create"}
+            </Button>
+            <Button onClick={() => setDrawerOpen(false)} variant="secondary">
+              Cancel
+            </Button>
+          </div>
+        </div>
+      </Drawer>
+
+      <Modal
+        open={confirmTarget !== null}
+        onClose={() => setConfirmTarget(null)}
+        title="Deactivate driver"
+      >
+        <p className="text-sm text-text-secondary">
+          Deactivate{" "}
+          <span className="font-medium text-text-primary">{confirmTarget?.label}</span>? They will
+          be removed from the roster.
+        </p>
+        <div className="flex justify-end gap-2 mt-5">
+          <Button variant="secondary" onClick={() => setConfirmTarget(null)}>
+            Cancel
+          </Button>
+          <Button
+            variant="danger"
+            disabled={deleteMutation.isPending}
+            onClick={() => confirmTarget && deleteMutation.mutate(confirmTarget.id)}
+          >
+            {deleteMutation.isPending ? "Deactivating…" : "Deactivate"}
+          </Button>
+        </div>
+      </Modal>
+    </div>
+  );
+};
+
+DriversTab.displayName = "DriversTab";

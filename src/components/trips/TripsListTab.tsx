@@ -1,0 +1,308 @@
+import React, { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { apiClient, keys, isApiError } from "@/lib/shared";
+import type { components } from "@/lib/shared/api/schema.d";
+import { useToastStore } from "@/stores/toastStore";
+import { Card } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import { StatusBadge } from "@/components/ui/StatusBadge";
+import { Modal } from "@/components/ui/Modal";
+import { Input } from "@/components/ui/Input";
+import { TripDetailView } from "@/components/trips/TripDetailView";
+import { cursorFromUrl } from "@/hooks/useCursorPagination";
+import { DateTimePicker } from "@/components/ui/DateTimePicker";
+import { ChevronRight, ChevronLeft, X, Building2, Clock, Car } from "lucide-react";
+import type { TripStatus } from "@/lib/types";
+
+type TripRequest = components["schemas"]["TripRequest"];
+
+const STATUS_FILTERS = ["", "DRAFT", "CONFIRMED", "ASSIGNED", "IN_PROGRESS", "COMPLETED", "BILLED", "CANCELLED"];
+
+/** Vendors that have been offered/assigned to this trip's vehicles, de-duped, in trip order. */
+const assignedVendors = (trip: TripRequest): string[] => {
+  const names: string[] = [];
+  const seen = new Set<string>();
+  for (const v of trip.vehicles ?? []) {
+    // PENDING means no vendor has been engaged yet — an offer or an assignment both count.
+    if (v.status === "PENDING" || !v.vendor_name) continue;
+    if (!seen.has(v.vendor_name)) {
+      seen.add(v.vendor_name);
+      names.push(v.vendor_name);
+    }
+  }
+  return names;
+};
+
+export const TripsListTab: React.FC = () => {
+  const addToast = useToastStore((s) => s.addToast);
+  const qc = useQueryClient();
+
+  const [statusFilter, setStatusFilter] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [cursor, setCursor] = useState<string | null>(null);
+  const [cursorStack, setCursorStack] = useState<Array<string | null>>([null]);
+  const [pageIdx, setPageIdx] = useState(0);
+
+  const [selectedTripId, setSelectedTripId] = useState<string | null>(null);
+  const [cancelTrip, setCancelTrip] = useState<TripRequest | null>(null);
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancelling, setCancelling] = useState(false);
+
+  const filters = {
+    status: statusFilter || undefined,
+    date_from: dateFrom || undefined,
+    date_to: dateTo || undefined,
+    cursor: cursor ?? undefined,
+  };
+
+  const { data, isLoading } = useQuery({
+    queryKey: keys.trips.list(filters),
+    queryFn: async () => {
+      const { data: res, error: err } = await apiClient.GET("/v1/trips", {
+        params: { query: filters },
+      });
+      if (err) throw err;
+      return res;
+    },
+  });
+
+  const trips: TripRequest[] = (data?.results ?? []) as TripRequest[];
+  // DRF returns `next` as a full URL; the API expects a bare `cursor` value. Feeding the
+  // URL straight back made Next silently re-serve page 1.
+  const nextCursor = cursorFromUrl(data?.next);
+  const hasPrev = pageIdx > 0;
+  const hasNext = !!nextCursor;
+
+  const goNext = () => {
+    if (!nextCursor) return;
+    const newStack = [...cursorStack.slice(0, pageIdx + 1), nextCursor];
+    setCursorStack(newStack);
+    setPageIdx(pageIdx + 1);
+    setCursor(nextCursor);
+  };
+
+  const goPrev = () => {
+    if (pageIdx === 0) return;
+    const newIdx = pageIdx - 1;
+    setPageIdx(newIdx);
+    setCursor(cursorStack[newIdx] ?? null);
+  };
+
+  const resetPagination = () => {
+    setCursor(null);
+    setCursorStack([null]);
+    setPageIdx(0);
+  };
+
+  const openCancel = (trip: TripRequest) => {
+    setCancelTrip(trip);
+    setCancelReason("");
+  };
+
+  const handleCancel = async () => {
+    if (!cancelTrip) return;
+    setCancelling(true);
+    try {
+      const vehicles = cancelTrip.vehicles ?? [];
+      if (vehicles.length === 0) {
+        addToast("No vehicles to cancel", "error");
+        return;
+      }
+      for (const v of vehicles) {
+        // Cancel each convoy vehicle. The transition serializer's field is `status` (not `to`),
+        // and apiClient handles the forced trailing slash + CSRF header — the previous raw
+        // csrfFetch sent `{to: "CANCELLED"}` to a slashless URL, so every cancel 400'd. The
+        // reason rides along in `context` (the serializer's optional free-form dict).
+        const { error: txErr } = await apiClient.POST("/v1/trips/{id}/vehicles/{vehicle_pk}/transitions", {
+          params: { path: { id: cancelTrip.id, vehicle_pk: v.id } },
+          body: { status: "CANCELLED", context: cancelReason ? { reason: cancelReason } : {} } as never,
+        });
+        if (txErr) throw txErr;
+      }
+      addToast("Trip cancelled", "success");
+      void qc.invalidateQueries({ queryKey: keys.trips.all() });
+      setCancelTrip(null);
+      setCancelReason("");
+    } catch (err) {
+      addToast(isApiError(err) ? err.message : err instanceof Error ? err.message : "Failed to cancel", "error");
+    } finally {
+      setCancelling(false);
+    }
+  };
+
+  if (selectedTripId) {
+    return (
+      <div>
+        <Button size="sm" variant="secondary" className="mb-4" onClick={() => setSelectedTripId(null)}>
+          <ChevronLeft className="w-4 h-4" /> Back to list
+        </Button>
+        <TripDetailView tripId={selectedTripId} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap gap-3 items-end">
+        <div>
+          <label className="block text-xs font-semibold text-text-primary mb-1.5">Status</label>
+          <select
+            value={statusFilter}
+            onChange={(e) => { setStatusFilter(e.target.value); resetPagination(); }}
+            className="px-3 h-10 bg-white border border-border rounded-lg text-sm text-text-primary hover:border-[#C2C7CF] transition-[border-color,box-shadow] cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue"
+          >
+            {STATUS_FILTERS.map((s) => (
+              <option key={s} value={s}>{s || "All statuses"}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs font-semibold text-text-primary mb-1.5">Date from</label>
+          <DateTimePicker mode="date" value={dateFrom} onChange={(val) => { setDateFrom(val); resetPagination(); }} />
+        </div>
+        <div>
+          <label className="block text-xs font-semibold text-text-primary mb-1.5">Date to</label>
+          <DateTimePicker mode="date" value={dateTo} onChange={(val) => { setDateTo(val); resetPagination(); }} />
+        </div>
+        {!isLoading && trips.length > 0 && (
+          <span className="ml-auto self-center px-2.5 py-1 rounded-full bg-ops-card2 text-xs text-text-secondary tabular-nums">
+            {trips.length} trip{trips.length !== 1 ? "s" : ""}{hasNext ? "+" : ""} on this page
+          </span>
+        )}
+      </div>
+
+      {isLoading ? (
+        <div className="space-y-2">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="h-[70px] rounded-xl border border-border skeleton" />
+          ))}
+        </div>
+      ) : trips.length === 0 ? (
+        <Card padding="lg" className="text-center py-12">
+          <p className="text-sm font-medium text-text-primary">No trip requests found</p>
+          <p className="text-xs text-text-tertiary mt-1">Adjust the status or date range, or create a new trip request.</p>
+        </Card>
+      ) : (
+        <div className="space-y-2">
+          {trips.map((trip) => {
+            const vendors = assignedVendors(trip);
+            const cancelable = !["COMPLETED", "BILLED", "CANCELLED"].includes(trip.status);
+            return (
+              <div
+                key={trip.id}
+                role="button"
+                tabIndex={0}
+                onClick={() => setSelectedTripId(trip.id)}
+                onKeyDown={(e) => e.key === "Enter" && setSelectedTripId(trip.id)}
+                className="group flex items-center gap-4 rounded-xl border border-border bg-white px-4 py-3.5 cursor-pointer shadow-soft transition-all hover:border-brand-blue/30 hover:shadow-lift hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/30"
+              >
+                <StatusBadge status={trip.status as TripStatus} />
+
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-mono text-sm font-semibold text-text-primary">{trip.reference}</span>
+                    {trip.customer_name && (
+                      <span className="text-sm text-text-secondary truncate">· {trip.customer_name}</span>
+                    )}
+                    {(trip.created_via === "API_PAX" || trip.created_via === "API_VEHICLE_COUNT") && (
+                      <span className="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-brand-blue/10 text-brand-blue">
+                        RITMO
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-ops-card2 text-text-secondary text-xs">
+                      <Clock className="w-3 h-3 shrink-0" />
+                      {trip.pickup_at ? new Date(trip.pickup_at).toLocaleString() : "No pickup time"}
+                    </span>
+                    {trip.vehicles.length > 0 && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent-gold/15 text-text-primary text-xs">
+                        <Car className="w-3 h-3 text-accent-gold shrink-0" />
+                        {trip.vehicles.length} vehicle{trip.vehicles.length !== 1 ? "s" : ""}
+                      </span>
+                    )}
+                    {vendors.length > 0 && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-brand-blue/10 text-brand-blue text-xs font-medium min-w-0">
+                        <Building2 className="w-3 h-3 shrink-0" />
+                        <span className="truncate">{vendors.join(", ")}</span>
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1 shrink-0">
+                  {cancelable && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={(e) => { e.stopPropagation(); openCancel(trip); }}
+                      className="text-danger hover:bg-danger/10"
+                    >
+                      <X className="w-3.5 h-3.5 mr-1" /> Cancel
+                    </Button>
+                  )}
+                  <ChevronRight className="w-4 h-4 text-text-tertiary transition-transform group-hover:translate-x-0.5" />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <div className="flex items-center justify-between pt-2">
+        <Button onClick={goPrev} disabled={!hasPrev} variant="secondary" size="sm">
+          <ChevronLeft className="w-4 h-4 mr-1" /> Prev
+        </Button>
+        <span className="text-xs text-text-secondary">Page {pageIdx + 1}</span>
+        <Button onClick={goNext} disabled={!hasNext} variant="secondary" size="sm">
+          Next <ChevronRight className="w-4 h-4 ml-1" />
+        </Button>
+      </div>
+
+      {cancelTrip && (
+        <Modal
+          open={true}
+          onClose={() => { setCancelTrip(null); }}
+          title="Cancel Trip"
+        >
+          <div className="space-y-4">
+            <p className="text-sm text-text-secondary">
+              Cancel trip <span className="font-mono font-medium">{cancelTrip.reference}</span>?
+              This will cancel all {cancelTrip.vehicles.length} vehicle(s).
+            </p>
+
+            <div>
+              <label className="block text-xs text-text-secondary mb-1">Reason (optional)</label>
+              <Input
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                placeholder="Reason for cancellation…"
+              />
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <Button
+                onClick={() => { void handleCancel(); }}
+                variant="primary"
+                className="flex-1 bg-danger hover:bg-danger/90"
+                disabled={cancelling}
+              >
+                {cancelling ? "Cancelling…" : "Confirm Cancel"}
+              </Button>
+              <Button
+                onClick={() => { setCancelTrip(null); }}
+                variant="secondary"
+                className="flex-1"
+              >
+                Keep Trip
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+};
+
+TripsListTab.displayName = "TripsListTab";

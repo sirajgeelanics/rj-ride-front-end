@@ -1,0 +1,42 @@
+import React, { useState } from "react";
+import { useLanguageStore, t } from "@/lib/shared";
+import { Search } from "lucide-react";
+import { Tabs } from "@/components/ui/Tabs";
+import { Card } from "@/components/ui/Card";
+import { RateCardsTab } from "@/components/pricing/RateCardsTab";
+import { QuoteSimulatorTab } from "@/components/pricing/QuoteSimulatorTab";
+
+const TABS = [
+  { id: "rate-cards", labelKey: "rateCards" as const },
+  { id: "simulator", labelKey: "simulator" as const },
+];
+
+export default function PricingPage() {
+  const language = useLanguageStore((s) => s.language);
+  const [activeTab, setActiveTab] = useState("rate-cards");
+  const [cacheMode, setCacheMode] = useState<"linked" | "cached">("linked");
+  const [searchQuery, setSearchQuery] = useState("");
+
+  return (
+    <div className="p-4 sm:p-6 lg:p-8 max-w-[1600px] mx-auto w-full space-y-6">
+      <div className="flex justify-between items-start">
+      </div>
+
+      {/* <div className="relative max-w-md">
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-text-secondary" />
+        <input
+          type="text"
+          placeholder={t("searchThisModule", language)}
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full pl-10 pr-3 py-2 bg-white border border-border rounded-lg text-sm text-text-primary placeholder-text-secondary focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-transparent"
+        />
+      </div> */}
+
+      <Tabs tabs={TABS.map((tab) => ({ id: tab.id, label: t(tab.labelKey, language) }))} activeTab={activeTab} onChange={setActiveTab}>
+        {activeTab === "rate-cards" && <RateCardsTab searchQuery={searchQuery} />}
+        {activeTab === "simulator" && <QuoteSimulatorTab searchQuery={searchQuery} />}
+      </Tabs>
+    </div>
+  );
+}

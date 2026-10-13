@@ -1,0 +1,9 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // Same Worker name as the previous OpenNext deployment, so deploys replace it in place.
+  "name": "rj-ravani-admin-front-end",
+  "main": "worker/index.ts",
+  "compatibility_date": "2025-03-25",
+  "assets": { "directory": "./dist", "binding": "ASSETS", "not_found_handling": "single-page-application" },
+  "vars": { "API_ORIGIN": "https://api-ravani.rezolv.app" }
+}
