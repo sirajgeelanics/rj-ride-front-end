@@ -6,16 +6,23 @@ interface ModalProps {
   onClose: () => void;
   title: string;
   children: React.ReactNode;
-  size?: "sm" | "md" | "lg";
+  size?: "sm" | "md" | "lg" | "xl";
+  /** A richer gold-accented border/shadow/header treatment for a dialog that should feel like
+   * a standout moment (e.g. a pricing/commercial-terms form), instead of this component's
+   * plain default — opt-in so every existing confirm dialog and form keeps its current look. */
+  premium?: boolean;
 }
 
 const sizeMap = {
   sm: "w-[calc(100vw-2rem)] sm:w-96",
   md: "w-[calc(100vw-2rem)] sm:w-[28rem]",
   lg: "w-[calc(100vw-2rem)] sm:w-[36rem]",
+  // For a form with more fields than lg comfortably fits (e.g. a multi-section create/edit
+  // dialog) — still centered and capped well under the viewport, never full-bleed.
+  xl: "w-[calc(100vw-2rem)] sm:w-[44rem]",
 };
 
-export const Modal: React.FC<ModalProps> = ({ open, onClose, title, children, size = "md" }) => {
+export const Modal: React.FC<ModalProps> = ({ open, onClose, title, children, size = "md", premium = false }) => {
   useEffect(() => {
     if (open) {
       document.body.style.overflow = "hidden";
@@ -58,12 +65,21 @@ export const Modal: React.FC<ModalProps> = ({ open, onClose, title, children, si
       onClick={onClose}
     >
       <div
-        className={`${sizeMap[size]} bg-white rounded-2xl border border-border shadow-modal flex flex-col max-h-[90vh] overflow-hidden transition-[transform,opacity] duration-300 ease-[var(--ease-spring)] ${
-          open ? "scale-100 opacity-100 translate-y-0" : "scale-95 opacity-0 translate-y-2"
-        }`}
+        className={`${sizeMap[size]} bg-white rounded-2xl flex flex-col max-h-[90vh] overflow-hidden transition-[transform,opacity] duration-300 ease-[var(--ease-spring)] ${
+          premium
+            ? "border-[1.5px] border-accent-gold/35 shadow-[0_32px_80px_-8px_rgba(4,32,74,0.38),0_0_0_1px_rgba(179,150,97,0.18),0_2px_10px_rgba(179,150,97,0.14)]"
+            : "border border-border shadow-modal"
+        } ${open ? "scale-100 opacity-100 translate-y-0" : "scale-95 opacity-0 translate-y-2"}`}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between gap-3 px-6 py-4 border-b border-ops-line bg-white">
+        {/* A thin gold strip rather than a bold banner — reads as "commercial terms, handle with
+            care" without competing with the serif title for attention. */}
+        {premium && <div className="h-[3px] shrink-0 bg-gradient-to-r from-accent-gold/70 via-accent-gold to-accent-gold/70" />}
+        <div
+          className={`flex items-center justify-between gap-3 px-6 py-4 ${
+            premium ? "border-b border-accent-gold/20 bg-gradient-to-b from-[#FBF8F1] to-white" : "border-b border-ops-line bg-white"
+          }`}
+        >
           <h2 className="font-serif text-2xl font-medium tracking-tight text-text-primary">{title}</h2>
           <button
             onClick={onClose}

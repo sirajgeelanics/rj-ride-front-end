@@ -9,6 +9,7 @@ import { VehicleNamesTab } from "@/components/configuration/VehicleNamesTab";
 import { VehiclesTab } from "@/components/configuration/VehiclesTab";
 import { DriversTab } from "@/components/configuration/DriversTab";
 import { PriorityMatrixTab } from "@/components/configuration/PriorityMatrixTab";
+import { NotificationsTab } from "@/components/configuration/NotificationsTab";
 
 const TABS = [
   { id: "vendors", labelKey: "vendors" as const },
@@ -18,6 +19,7 @@ const TABS = [
   { id: "vehicles", labelKey: "vehiclesTab" as const },
   { id: "drivers", labelKey: "driversTab" as const },
   { id: "priority-matrix", labelKey: "priorityMatrix" as const },
+  { id: "notifications", labelKey: "notifications" as const },
 ];
 
 export default function ConfigurationPage() {
@@ -57,6 +59,7 @@ export default function ConfigurationPage() {
         {activeTab === "vehicles" && <VehiclesTab searchQuery={searchQuery} />}
         {activeTab === "drivers" && <DriversTab searchQuery={searchQuery} />}
         {activeTab === "priority-matrix" && <PriorityMatrixTab />}
+        {activeTab === "notifications" && <NotificationsTab />}
       </Tabs>
     </div>
   );

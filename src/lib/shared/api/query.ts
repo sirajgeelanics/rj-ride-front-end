@@ -50,6 +50,14 @@ export const keys = {
       detail: (id: string) =>
         ["config", "pricing", "rate-cards", "detail", id] as const,
     },
+    hotelRates: {
+      list: (filters?: FiltersShape) =>
+        ["config", "pricing", "hotel-rates", "list", filters ?? {}] as const,
+    },
+    hotelSearch: {
+      list: (airportCode: string) =>
+        ["config", "pricing", "hotels", "search", airportCode] as const,
+    },
   },
 
   trips: {
@@ -57,6 +65,10 @@ export const keys = {
     list: (filters?: FiltersShape) =>
       ["trips", "list", filters ?? {}] as const,
     detail: (id: string) => ["trips", "detail", id] as const,
+    replay: (tripId: string, tripVehicleId: string) =>
+      ["trips", "replay", tripId, tripVehicleId] as const,
+    rosterStatus: (customerId: string) =>
+      ["trips", "roster-status", customerId] as const,
     recurringRules: {
       list: () => ["trips", "recurring-rules", "list"] as const,
       detail: (id: string) =>
@@ -138,6 +150,7 @@ export const keys = {
   tracking: {
     all: () => ["tracking"] as const,
     live: () => ["tracking", "live"] as const,
+    fleet: () => ["tracking", "fleet"] as const,
     track: (tripVehicleId: string) =>
       ["tracking", "track", tripVehicleId] as const,
   },

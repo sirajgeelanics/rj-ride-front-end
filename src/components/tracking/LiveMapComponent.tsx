@@ -6,10 +6,13 @@ import { markerHex } from "./markerColors";
 type LivePosition = {
   trip_vehicle_id: string;
   status?: string;
+  fleet_status?: string;
   marker_color?: string;
   lat?: number | null;
   lng?: number | null;
   speed?: number | null;
+  ignition?: boolean | null;
+  motion?: boolean | null;
 };
 
 interface LiveMapComponentProps {
@@ -84,16 +87,23 @@ const LiveMapComponent: React.FC<LiveMapComponentProps> = ({
       const color = pos.marker_color ?? "808080";
       const isSelected = selectedTripVehicleId === id;
       const icon = makeVehicleIcon(color, isSelected);
+      // Not every device/ping reports ignition/motion (a driver-app GPS fix never does, only
+      // hardware trackers with OBD/ignition wiring) — omit the line entirely rather than show
+      // a misleading "off"/"stopped" default when it is genuinely unknown.
+      const ignitionLine =
+        pos.ignition != null ? `<br/>Ignition: ${pos.ignition ? "On" : "Off"}` : "";
+      const motionLine = pos.motion != null ? `<br/>${pos.motion ? "Moving" : "Stationary"}` : "";
+      const label = pos.status ?? pos.fleet_status ?? "?";
+      const popupHtml = `<div style="font-size:11px"><strong>${label}</strong><br/>${pos.lat.toFixed(4)}, ${pos.lng.toFixed(4)}${pos.speed != null ? `<br/>${pos.speed} km/h` : ""}${ignitionLine}${motionLine}</div>`;
 
       const existing = markersRef.current.get(id);
       if (existing) {
         existing.setLatLng([pos.lat, pos.lng]);
         existing.setIcon(icon);
+        existing.setPopupContent(popupHtml);
       } else {
         const marker = L.marker([pos.lat, pos.lng], { icon })
-          .bindPopup(
-            `<div style="font-size:11px"><strong>${pos.status ?? "?"}</strong><br/>${pos.lat.toFixed(4)}, ${pos.lng.toFixed(4)}${pos.speed != null ? `<br/>${pos.speed} km/h` : ""}</div>`
-          )
+          .bindPopup(popupHtml)
           .addTo(map);
         marker.on("click", () => {
           onSelectVehicle(id === selectedTripVehicleId ? null : id);
@@ -120,7 +130,7 @@ const LiveMapComponent: React.FC<LiveMapComponentProps> = ({
     }
   }, [positions, selectedTripVehicleId, onSelectVehicle, positionsTick]);
 
-  return <div ref={mapRef} className="h-80 w-full rounded border border-border" />;
+  return <div ref={mapRef} className="h-[75vh] min-h-[560px] w-full rounded border border-border" />;
 };
 
 export default LiveMapComponent;

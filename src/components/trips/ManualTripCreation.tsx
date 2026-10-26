@@ -249,6 +249,11 @@ export const ManualTripCreation: React.FC<{ onDone?: () => void }> = ({ onDone }
       .sort((a, b) => (a.capacity ?? 0) - (b.capacity ?? 0));
   }, [visibleVehicleTypes, totalPax]);
 
+  // Passengers actually named across every slot — the "Total passengers" counter below must
+  // never show fewer than this, even though totalPax itself (used for vehicle-size
+  // suggestions) is a separate, manually-set value that doesn't grow on its own.
+  const namedPaxCount = useMemo(() => slots.reduce((n, s) => n + s.pax.length, 0), [slots]);
+
   // Largest capacity the vendor has any rate card for at all — only meaningful when nothing
   // above fits, to tell the difference between "no vehicle is big enough" and "no vehicle
   // types loaded yet".
@@ -699,7 +704,7 @@ export const ManualTripCreation: React.FC<{ onDone?: () => void }> = ({ onDone }
               type="text"
               inputMode="numeric"
               pattern="[0-9]*"
-              value={paxText}
+              value={namedPaxCount > totalPax ? String(namedPaxCount) : paxText}
               onChange={(e) => onPaxTextChange(e.target.value)}
               onBlur={onPaxTextBlur}
               aria-label="Passenger count"

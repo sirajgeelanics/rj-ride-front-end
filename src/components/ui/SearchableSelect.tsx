@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ChevronDown, X } from "lucide-react";
+import { Check, ChevronDown, SearchX, X } from "lucide-react";
 
 interface Option {
   value: string;
@@ -9,6 +9,15 @@ interface Option {
   disabled?: boolean;
   /** Short reason shown next to a disabled option, e.g. "on a trip". */
   hint?: string;
+  /**
+   * A second, muted line under the label — for an option that needs more than a name to
+   * recognise (e.g. a hotel's address). Omit for the plain single-line row every other caller
+   * already uses; this never changes their layout.
+   */
+  description?: string;
+  /** A short highlighted pill rendered inline right after the label (e.g. a hotel's star
+   * rating, "5★"). Independent of `description`. */
+  badge?: string;
 }
 
 interface SearchableSelectProps {
@@ -44,6 +53,7 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
   const [highlight, setHighlight] = useState(0);
   const rootRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const optionRefs = useRef<(HTMLDivElement | null)[]>([]);
   // The menu renders in a portal on <body>, so an ancestor with overflow:hidden/auto
   // (drawers, modals, scroll panes) can never clip it. Position is measured from the input.
   const [pos, setPos] = useState<{ top: number; left: number; width: number; drop: "down" | "up" } | null>(null);
@@ -55,7 +65,12 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return options;
-    return options.filter((o) => o.label.toLowerCase().includes(q));
+    // Name match wins outright: if anything's label matches, that's the whole result —
+    // description (e.g. a hotel's address) only gets searched when NO name matches at all, so
+    // typing a street name still finds the hotel instead of coming back empty.
+    const byName = options.filter((o) => o.label.toLowerCase().includes(q));
+    if (byName.length > 0) return byName;
+    return options.filter((o) => o.description?.toLowerCase().includes(q));
   }, [options, query]);
 
   useEffect(() => {
@@ -74,8 +89,17 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
     return () => document.removeEventListener("mousedown", onDocMouseDown);
   }, [open]);
 
+  // Arrow-key navigation moves `highlight`, but the menu's own scroll position doesn't follow
+  // it for free — without this, arrowing down past the visible rows leaves the highlight
+  // invisible below the fold instead of scrolling the list to keep up.
+  useEffect(() => {
+    if (!open) return;
+    optionRefs.current[highlight]?.scrollIntoView({ block: "nearest" });
+  }, [open, highlight]);
 
-  const MENU_MAX_H = 224; // matches max-h-56
+
+  const MENU_MAX_H = 288; // matches max-h-72 — two-line options (e.g. a hotel's name + address)
+  // need more vertical room per row than the old single-line 224px allowed before scrolling.
 
   const reposition = useCallback(() => {
     const el = rootRef.current;
@@ -196,14 +220,20 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
               ? { top: pos.top }
               : { bottom: window.innerHeight - pos.top }),
           }}
-          className="z-[100] max-h-56 overflow-auto bg-white border border-border rounded-xl shadow-lift animate-menu-in"
+          className="z-[100] max-h-72 overflow-auto bg-white border border-border rounded-xl shadow-lift ring-1 ring-black/5 divide-y divide-border/50 animate-menu-in"
         >
           {filtered.length === 0 ? (
-            <div className="px-3 py-2 text-sm text-text-secondary">No matches</div>
+            <div className="px-3 py-6 flex flex-col items-center gap-1.5 text-text-tertiary">
+              <SearchX className="w-5 h-5" />
+              <span className="text-sm">No matches</span>
+            </div>
           ) : (
             filtered.map((opt, i) => (
               <div
                 key={opt.value}
+                ref={(el) => {
+                  optionRefs.current[i] = el;
+                }}
                 role="option"
                 aria-selected={opt.value === value}
                 aria-disabled={opt.disabled || undefined}
@@ -212,19 +242,37 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
                   select(opt);
                 }}
                 onMouseEnter={() => !opt.disabled && setHighlight(i)}
+                title={opt.description ? `${opt.label} — ${opt.description}` : opt.label}
                 className={
                   opt.disabled
-                    ? "px-3 py-2 text-sm flex items-center justify-between gap-2 text-text-tertiary bg-slate-50 cursor-not-allowed"
-                    : `px-3 py-2 text-sm flex items-center justify-between gap-2 cursor-pointer hover:bg-brand-blue/10 ${
+                    ? `px-3 ${opt.description ? "py-2.5" : "py-2"} text-sm text-text-tertiary bg-slate-50 cursor-not-allowed flex items-center justify-between gap-2`
+                    : `px-3 ${opt.description ? "py-2.5" : "py-2"} text-sm cursor-pointer hover:bg-brand-blue/10 flex items-center justify-between gap-2 ${
                         i === highlight ? "bg-brand-blue/10" : ""
                       } ${opt.value === value ? "font-medium text-brand-blue" : "text-text-primary"}`
                 }
               >
-                <span className={opt.disabled ? "line-through" : ""}>{opt.label}</span>
-                {opt.disabled && opt.hint && (
+                <div className="min-w-0 flex-1">
+                  <span className="flex items-center gap-1.5">
+                    <span className={`truncate ${opt.disabled ? "line-through" : ""}`}>{opt.label}</span>
+                    {opt.badge && (
+                      <span className="shrink-0 text-[11px] font-semibold leading-none text-amber-800 bg-amber-100 border border-amber-300 rounded px-1 py-0.5">
+                        {opt.badge}
+                      </span>
+                    )}
+                  </span>
+                  {/* Two-line row: a name alone isn't enough to tell options apart (e.g. two
+                      hotels of the same brand) — the muted second line carries the rest.
+                      Truncated, not wrapped: a long address otherwise stretches this one row
+                      to 2-3 lines while its neighbours stay one, and the whole list reads as
+                      uneven and messy — full text is still one hover away via the title above. */}
+                  {opt.description && <div className="text-xs text-text-tertiary truncate mt-0.5">{opt.description}</div>}
+                </div>
+                {opt.disabled && opt.hint ? (
                   <span className="text-xs shrink-0 px-1.5 py-0.5 rounded bg-slate-200 text-slate-600">
                     {opt.hint}
                   </span>
+                ) : (
+                  opt.value === value && <Check className="w-4 h-4 shrink-0 text-brand-blue" />
                 )}
               </div>
             ))

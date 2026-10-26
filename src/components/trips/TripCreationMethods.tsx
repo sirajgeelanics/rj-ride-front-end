@@ -1,13 +1,18 @@
 import React, { useEffect } from "react";
-import { ArrowRight, CalendarClock, ClipboardPen, Copy, FileSpreadsheet, Inbox, Sparkles, X } from "lucide-react";
+import { ArrowRight, Building2, CalendarClock, ClipboardPen, Copy, FileSpreadsheet, Inbox, Sparkles, X } from "lucide-react";
 import { useLanguageStore, t } from "@/lib/shared";
 
-export type CreationMethod = "MANUAL" | "BULK_UPLOAD" | "RECURRING" | "CLONE";
+export type CreationMethod = "MANUAL" | "BULK_UPLOAD" | "RECURRING" | "CLONE" | "ROSTER";
 
 interface MethodDef {
   id: CreationMethod;
   icon: React.ComponentType<{ className?: string }>;
-  titleKey: "manualEntry" | "bulkUploadCSV" | "recurringGenerator" | "cloneExistingTrip";
+  titleKey:
+    | "manualEntry"
+    | "bulkUploadCSV"
+    | "recurringGenerator"
+    | "cloneExistingTrip"
+    | "corporateShiftRoster";
   description: string;
   chip: string;
   featured?: boolean;
@@ -42,6 +47,14 @@ export const METHODS: MethodDef[] = [
     titleKey: "cloneExistingTrip",
     description: "Start from a trip you already have and change only what is different.",
     chip: "From a past trip",
+  },
+  {
+    id: "ROSTER",
+    icon: Building2,
+    titleKey: "corporateShiftRoster",
+    description:
+      "Upload a corporate client's employee shift roster — nearby employees with compatible shift times are pooled into shared pickups/drops, on a standing weekly schedule.",
+    chip: "Standing schedule",
   },
 ];
 

@@ -33,6 +33,10 @@ interface VehicleWriteInput {
   vehicle_name?: string;
   plate: string;
   traccar_device_id?: string;
+  // The tracker's own hardware identifier — separate from traccar_device_id (Traccar's own id,
+  // only assigned once the device is registered there). Used by pair_traccar_devices to match
+  // Traccar's uniqueId; settable here too for a one-off manual entry.
+  imei?: string;
   // Only meaningful (and only shown) when the vendor operates at more than one airport.
   airport_code?: string;
   is_active?: boolean;
@@ -187,7 +191,7 @@ export const VehiclesTab: React.FC<VehiclesTabProps> = ({ searchQuery = "" }) =>
   // Deactivation asks for confirmation first (it removes the vehicle from the fleet).
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; label: string } | null>(null);
 
-  const emptyForm: VehicleWriteInput = { vendor: "", vehicle_type: "", vehicle_name: "", plate: "", traccar_device_id: "", airport_code: "", is_active: true };
+  const emptyForm: VehicleWriteInput = { vendor: "", vehicle_type: "", vehicle_name: "", plate: "", traccar_device_id: "", imei: "", airport_code: "", is_active: true };
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState<VehicleWriteInput>(emptyForm);
@@ -200,12 +204,14 @@ export const VehiclesTab: React.FC<VehiclesTabProps> = ({ searchQuery = "" }) =>
 
   const openEdit = (vehicle: ApiVehicle) => {
     setEditingId(vehicle.id);
+    const vehicleImei = (vehicle as { imei?: string }).imei;
     setFormData({
       vendor: vehicle.vendor,
       vehicle_type: vehicle.vehicle_type,
       vehicle_name: vehicle.vehicle_name ?? "",
       plate: vehicle.plate,
       traccar_device_id: vehicle.traccar_device_id ?? "",
+      imei: vehicleImei ?? "",
       airport_code: vehicle.airport_code ?? "",
       is_active: vehicle.is_active,
     });
@@ -232,6 +238,7 @@ export const VehiclesTab: React.FC<VehiclesTabProps> = ({ searchQuery = "" }) =>
       vehicle_name: formData.vehicle_name || undefined,
       plate: formData.plate.trim(),
       traccar_device_id: formData.traccar_device_id?.trim() || undefined,
+      imei: formData.imei?.trim() || undefined,
       airport_code: showAirport ? formData.airport_code : "",
       is_active: formData.is_active,
     };
@@ -445,6 +452,20 @@ export const VehiclesTab: React.FC<VehiclesTabProps> = ({ searchQuery = "" }) =>
             />
           </FormField>
 
+          <FormField label="GPS Tracker IMEI">
+            <Input
+              value={formData.imei ?? ""}
+              onChange={(e) => setFormData({ ...formData, imei: e.target.value })}
+              placeholder="Optional — e.g. 865000112233945"
+              inputMode="numeric"
+            />
+            <p className="text-xs text-text-secondary mt-1">
+              The physical tracker&apos;s own hardware id, printed on the device. Set this once at
+              install time — it never changes, even if the tracker is later moved to a different
+              vehicle.
+            </p>
+          </FormField>
+
           <FormField label="Traccar Device ID">
             <Input
               value={formData.traccar_device_id ?? ""}
@@ -455,7 +476,8 @@ export const VehiclesTab: React.FC<VehiclesTabProps> = ({ searchQuery = "" }) =>
             <p className="text-xs text-text-secondary mt-1">
               Traccar&apos;s <strong>numeric device id</strong> (the <code>id</code> column in
               Traccar → Devices) — not the IMEI or plate. GPS only reaches this vehicle when this
-              matches.
+              matches. Usually auto-filled by running <code>pair_traccar_devices</code> once the
+              IMEI above is set; only edit this directly if you already know the exact number.
             </p>
           </FormField>
 

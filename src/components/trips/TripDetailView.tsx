@@ -9,8 +9,9 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import { PII } from "@/components/ui/PII";
 import { StateTransitionManager } from "@/components/trips/StateTransitionManager";
 import { VehicleAssignmentModal } from "@/components/trips/VehicleAssignmentModal";
+import { TripReplayModal } from "@/components/trips/TripReplayModal";
 import { PassengerRecord, type PassengerRow } from "@/components/trips/PassengerRecord";
-import { Car, Building2, MapPin, Clock } from "lucide-react";
+import { Car, Building2, MapPin, Clock, RefreshCw, Film } from "lucide-react";
 
 type TripRequest = components["schemas"]["TripRequest"];
 type TripVehicle = components["schemas"]["TripVehicle"];
@@ -34,8 +35,12 @@ export const TripDetailView: React.FC<TripDetailViewProps> = ({ tripId }) => {
     mode: "assign" | "reassign";
     paxCount: number;
   } | null>(null);
+  const [replayModal, setReplayModal] = useState<{
+    tripVehicleId: string;
+    label?: string;
+  } | null>(null);
 
-  const { data: trip, isLoading, error } = useQuery<TripRequest>({
+  const { data: trip, isLoading, isFetching, error, refetch } = useQuery<TripRequest>({
     queryKey: keys.trips.detail(tripId),
     queryFn: async () => {
       const { data: res, error: err } = await apiClient.GET("/v1/trips/{id}", {
@@ -87,6 +92,9 @@ export const TripDetailView: React.FC<TripDetailViewProps> = ({ tripId }) => {
             {trip.created_via && ` · ${trip.created_via}`}
           </p>
         </div>
+        <Button variant="secondary" size="sm" onClick={() => void refetch()} disabled={isFetching}>
+          <RefreshCw className={`w-4 h-4 mr-1 ${isFetching ? "animate-spin" : ""}`} /> Refresh
+        </Button>
       </div>
 
       <Card padding="md" header={<h3 className="text-sm font-semibold">Stops</h3>}>
@@ -189,6 +197,17 @@ export const TripDetailView: React.FC<TripDetailViewProps> = ({ tripId }) => {
                     Reassign vehicle &amp; driver
                   </Button>
                 )}
+                {v.status === "COMPLETED" && (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() =>
+                      setReplayModal({ tripVehicleId: v.id, label: v.vehicle_plate ?? undefined })
+                    }
+                  >
+                    <Film className="w-3.5 h-3.5 mr-1" /> Trip replay
+                  </Button>
+                )}
               </div>
 
               <StateTransitionManager tripId={trip.id} vehicleId={v.id} currentStatus={v.status} />
@@ -204,6 +223,15 @@ export const TripDetailView: React.FC<TripDetailViewProps> = ({ tripId }) => {
           mode={assignmentModal.mode}
           paxCount={assignmentModal.paxCount}
           onClose={() => setAssignmentModal(null)}
+        />
+      )}
+
+      {replayModal && (
+        <TripReplayModal
+          tripId={trip.id}
+          tripVehicleId={replayModal.tripVehicleId}
+          label={replayModal.label}
+          onClose={() => setReplayModal(null)}
         />
       )}
     </div>

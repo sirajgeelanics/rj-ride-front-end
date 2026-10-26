@@ -9,6 +9,7 @@ import { FleetFilterPanel } from "@/components/trips/FleetFilterPanel";
 import { ManualTripCreation } from "@/components/trips/ManualTripCreation";
 import { BulkUploadCreation } from "@/components/trips/BulkUploadCreation";
 import { RecurringCreation } from "@/components/trips/RecurringCreation";
+import { RosterUploadCreation } from "@/components/trips/RosterUploadCreation";
 import { CloneCreation } from "@/components/trips/CloneCreation";
 import { MethodPicker, TripCreationDialog, type CreationMethod } from "@/components/trips/TripCreationMethods";
 
@@ -56,6 +57,7 @@ export default function TripsPage() {
           {creationMethod === "MANUAL" && <ManualTripCreation onDone={handleTripCreated} />}
           {creationMethod === "BULK_UPLOAD" && <BulkUploadCreation onDone={handleTripCreated} />}
           {creationMethod === "RECURRING" && <RecurringCreation />}
+          {creationMethod === "ROSTER" && <RosterUploadCreation onDone={handleTripCreated} />}
           {creationMethod === "CLONE" && <CloneCreation onDone={handleTripCreated} />}
         </TripCreationDialog>
       )}

@@ -4,6 +4,7 @@ import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
 import { Toaster } from "@/components/ui/Toaster";
 import { RouteGuard } from "./RouteGuard";
+import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 
 const AUTH_PATHS = ["/login"];
 
@@ -22,15 +23,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <RouteGuard>
-      <div className="flex h-screen bg-ops-bg overflow-x-hidden">
-        <Sidebar open={mobileNavOpen} onClose={() => setMobileNavOpen(false)} />
-        <div className="flex-1 flex flex-col min-w-0">
-          <TopBar onMenuClick={() => setMobileNavOpen(true)} />
-          <main className="flex-1 overflow-y-auto overflow-x-hidden bg-ops-bg bg-ops-grid custom-scrollbar">{children}</main>
+    <ErrorBoundary>
+      <RouteGuard>
+        <div className="flex h-screen bg-ops-bg overflow-x-hidden">
+          <Sidebar open={mobileNavOpen} onClose={() => setMobileNavOpen(false)} />
+          <div className="flex-1 flex flex-col min-w-0">
+            <TopBar onMenuClick={() => setMobileNavOpen(true)} />
+            <main className="flex-1 overflow-y-auto overflow-x-hidden bg-ops-bg bg-ops-grid custom-scrollbar">
+              <ErrorBoundary>{children}</ErrorBoundary>
+            </main>
+          </div>
         </div>
-      </div>
-      <Toaster />
-    </RouteGuard>
+        <Toaster />
+      </RouteGuard>
+    </ErrorBoundary>
   );
 }

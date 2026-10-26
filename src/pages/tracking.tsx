@@ -8,7 +8,7 @@ import { Card } from "@/components/ui/Card";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import type { VehicleStatus } from "@/lib/types";
 import { Badge } from "@/components/ui/Badge";
-import { Navigation, AlertCircle, MapPin, MapIcon, Gauge, User, Car, X, LocateFixed } from "lucide-react";
+import { Navigation, AlertCircle, MapPin, MapIcon, Gauge, User, Car, X, LocateFixed, Key, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { markerHex } from "@/components/tracking/markerColors";
 import { dynamic } from "@/lib/router";
@@ -20,7 +20,13 @@ type LivePosition = {
   vehicle_id?: string | null;
   plate?: string | null;
   vendor_id?: string | null;
+  vendor_name?: string | null;
   status?: string;
+  // Only set for a "full fleet" entry (apps.tracking.api.views.FleetLocationsView) — the
+  // coarser fleet.Location vocabulary (active/on_trip/breakdown/not_available), distinct
+  // from `status`'s TripVehicle vocabulary, which a fleet entry never has.
+  fleet_status?: string;
+  isFleetEntry?: boolean;
   marker_color?: string;
   driver_name?: string | null;
   driver_phone?: string | null;
@@ -29,15 +35,53 @@ type LivePosition = {
   lng?: number | null;
   speed?: number | null;
   heading?: number | null;
+  ignition?: boolean | null;
+  motion?: boolean | null;
   timestamp?: string;
   position?: {
     lat: number;
     lng: number;
     speed_kmh?: number;
     heading?: number;
+    ignition?: boolean | null;
+    motion?: boolean | null;
     at?: string;
   } | null;
 };
+
+// apps.tracking.api.views.FleetLocationsView's raw response shape — every tracked vehicle's
+// last position regardless of trip state, the "full fleet" toggle's data source.
+type FleetVehicle = {
+  vehicle_id: string;
+  plate?: string | null;
+  vendor_id?: string | null;
+  vendor_name?: string | null;
+  fleet_status: string;
+  marker_color: string;
+  lat: number;
+  lng: number;
+  ignition?: boolean | null;
+  motion?: boolean | null;
+  last_updated: string;
+};
+
+function fleetVehicleToPosition(fv: FleetVehicle): LivePosition {
+  return {
+    trip_vehicle_id: fv.vehicle_id, // reused purely as LiveMapComponent's marker key
+    vehicle_id: fv.vehicle_id,
+    plate: fv.plate,
+    vendor_id: fv.vendor_id,
+    vendor_name: fv.vendor_name,
+    fleet_status: fv.fleet_status,
+    isFleetEntry: true,
+    marker_color: fv.marker_color,
+    lat: fv.lat,
+    lng: fv.lng,
+    ignition: fv.ignition,
+    motion: fv.motion,
+    timestamp: fv.last_updated,
+  };
+}
 
 type TrackMilestone = {
   label: string;
@@ -91,7 +135,7 @@ function toTrackDetail(raw: RawTrackResult | null | undefined): TrackDetail | nu
 const LiveMapComponent = dynamic(() => import("@/components/tracking/LiveMapComponent"), {
   ssr: false,
   loading: () => (
-    <div className="h-80 skeleton flex items-center justify-center text-text-secondary text-sm">
+    <div className="h-[75vh] min-h-[560px] skeleton flex items-center justify-center text-text-secondary text-sm">
       Loading map…
     </div>
   ),
@@ -100,12 +144,26 @@ const LiveMapComponent = dynamic(() => import("@/components/tracking/LiveMapComp
 export default function TrackingPage() {
   const addToast = useToastStore((s) => s.addToast);
 
+  // Browser-reachable Traccar URL (distinct from the backend's internal TRACCAR_BASE_URL,
+  // which uses a docker-internal hostname the browser can never reach) — unset hides the link
+  // entirely. Traccar runs as its own separate app now (not embedded here — cross-origin
+  // iframe embedding broke its session cookie, see the "redirect link only" decision), so this
+  // is just a plain link out to it. Read via `process.env`, same as NEXT_PUBLIC_WS_ORIGIN
+  // elsewhere in this codebase (src/lib/envShim.ts mirrors Vite's import.meta.env into
+  // process.env for every NEXT_PUBLIC_* key before anything else loads).
+  const traccarUrl = process.env["NEXT_PUBLIC_TRACCAR_URL"] || "";
+
   const [selectedTripVehicleId, setSelectedTripVehicleId] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<"active" | "fleet">("active");
+
+  useEffect(() => {
+    setSelectedTripVehicleId(null);
+  }, [viewMode]);
 
   const livePositionsRef = useRef<Map<string, LivePosition>>(new Map());
   const [positionsTick, setPositionsTick] = useState(0);
 
-  const { data: initialPositions, isLoading } = useQuery<LivePosition[]>({
+  const { data: initialPositions, isLoading: isLoadingActive } = useQuery<LivePosition[]>({
     queryKey: keys.tracking.live(),
     queryFn: async () => {
       const resp = await fetch("/api/v1/tracking/live/", { credentials: "include" });
@@ -114,7 +172,25 @@ export default function TrackingPage() {
       return (envelope.result?.vehicles ?? []) as LivePosition[];
     },
     refetchInterval: 60_000,
+    enabled: viewMode === "active",
   });
+
+  // The "full fleet" toggle (apps.tracking.api.views.FleetLocationsView) — every tracked
+  // vehicle regardless of trip state. No WS push covers idle vehicles (broadcast_positions
+  // only broadcasts on-trip ones), so this polls more often to make up for it.
+  const { data: fleetVehicles, isLoading: isLoadingFleet } = useQuery<FleetVehicle[]>({
+    queryKey: keys.tracking.fleet(),
+    queryFn: async () => {
+      const resp = await fetch("/api/v1/tracking/fleet/", { credentials: "include" });
+      if (!resp.ok) throw new Error(`tracking/fleet failed: ${resp.status}`);
+      const envelope = await resp.json() as { result?: { vehicles?: FleetVehicle[] } };
+      return (envelope.result?.vehicles ?? []) as FleetVehicle[];
+    },
+    refetchInterval: 20_000,
+    enabled: viewMode === "fleet",
+  });
+
+  const isLoading = viewMode === "active" ? isLoadingActive : isLoadingFleet;
 
   // Coordinates have crashed here once already from a real, upstream string-vs-number mismatch
   // (core.positions.Position keeps lat/lng as str at rest) — coerce defensively at this
@@ -130,6 +206,16 @@ export default function TrackingPage() {
   // without this flattening no marker was EVER plotted, regardless of how many vehicles were in
   // the list: LiveMapComponent's own `pos.lat == null` guard silently skipped every one of them.
   useEffect(() => {
+    if (viewMode === "fleet") {
+      const map = new Map<string, LivePosition>();
+      for (const fv of fleetVehicles ?? []) {
+        map.set(fv.vehicle_id, fleetVehicleToPosition(fv));
+      }
+      livePositionsRef.current = map;
+      setPositionsTick((t) => t + 1);
+      return;
+    }
+
     if (!initialPositions) return;
     const map = new Map<string, LivePosition>();
     for (const pos of initialPositions) {
@@ -140,12 +226,14 @@ export default function TrackingPage() {
         lng: toNum(pos.position?.lng ?? pos.lng),
         speed: toNum(pos.position?.speed_kmh ?? pos.speed),
         heading: toNum(pos.position?.heading ?? pos.heading),
+        ignition: pos.position?.ignition ?? pos.ignition ?? null,
+        motion: pos.position?.motion ?? pos.motion ?? null,
         timestamp: pos.position?.at ?? pos.timestamp,
       });
     }
     livePositionsRef.current = map;
     setPositionsTick((t) => t + 1);
-  }, [initialPositions]);
+  }, [initialPositions, fleetVehicles, viewMode]);
 
   // The real broadcast (apps.tracking.tasks: {"type": "dispatch.event", "event_type":
   // "tracking.position", "payload": {trip_vehicle_id, lat, lng, speed_kmh, heading, at, ...}})
@@ -167,6 +255,9 @@ export default function TrackingPage() {
         lng: toNum(payload.lng) ?? existing.lng,
         speed: toNum(payload.speed_kmh) ?? existing.speed,
         heading: toNum(payload.heading) ?? existing.heading,
+        ignition:
+          typeof payload.ignition === "boolean" ? payload.ignition : existing.ignition ?? null,
+        motion: typeof payload.motion === "boolean" ? payload.motion : existing.motion ?? null,
         timestamp: (payload.at as string | undefined) ?? existing.timestamp,
       });
       setPositionsTick((t) => t + 1);
@@ -207,42 +298,106 @@ export default function TrackingPage() {
   const positions = Array.from(livePositionsRef.current.values());
   const activeCount = positions.filter((p) => p.status && !["COMPLETED", "CANCELLED"].includes(p.status)).length;
   const sosCount = positions.filter((p) => p.status === "SOS").length;
+  const fleetOnTripCount = positions.filter((p) => p.fleet_status === "on_trip").length;
+  const breakdownCount = positions.filter((p) => p.fleet_status === "breakdown").length;
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-[1600px] mx-auto w-full space-y-6">
-      <div>
-        <h1 className="font-serif text-2xl font-medium tracking-tight text-text-primary flex items-center gap-2">
-          <MapIcon className="w-5 h-5 text-accent-gold" /> Live Tracking
-        </h1>
-        <p className="text-sm text-text-secondary mt-1">Real-time positions for every vehicle currently on a trip.</p>
+      <div className="flex items-start justify-between flex-wrap gap-3">
+        <div>
+          <h1 className="font-serif text-2xl font-medium tracking-tight text-text-primary flex items-center gap-2">
+            <MapIcon className="w-5 h-5 text-accent-gold" /> Live Tracking
+          </h1>
+          <p className="text-sm text-text-secondary mt-1">
+            {viewMode === "active"
+              ? "Real-time positions for every vehicle currently on a trip."
+              : "Every tracked vehicle's last-known position, on a trip or idle."}
+          </p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {!!traccarUrl && (
+            <a
+              href={traccarUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Opens Traccar's own app in a new tab — separate login, not linked to RIDE trips."
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border border-border bg-white text-text-secondary hover:bg-page-bg transition-colors"
+            >
+              Traccar <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+          )}
+          <div className="inline-flex rounded-xl border border-border bg-white p-1">
+            <button
+              onClick={() => setViewMode("active")}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                viewMode === "active" ? "bg-brand-blue text-white" : "text-text-secondary"
+              }`}
+            >
+              Active trips
+            </button>
+            <button
+              onClick={() => setViewMode("fleet")}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                viewMode === "fleet" ? "bg-brand-blue text-white" : "text-text-secondary"
+              }`}
+            >
+              Full fleet
+            </button>
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 stagger">
-        <div className="bg-white border border-border shadow-soft rounded-2xl p-4 hover-lift">
-          <p className="eyebrow flex items-center gap-1.5">
-            <Navigation className="w-3.5 h-3.5" /> Active
-          </p>
-          <p className="text-3xl font-semibold tabular-nums text-text-primary mt-2">{activeCount}</p>
-        </div>
-        <div className="bg-white border border-border shadow-soft rounded-2xl p-4 hover-lift">
-          <p className="eyebrow flex items-center gap-1.5">
-            <MapPin className="w-3.5 h-3.5" /> Total on map
-          </p>
-          <p className="text-3xl font-semibold tabular-nums text-text-primary mt-2">{positions.length}</p>
-        </div>
-        <div className={`${sosCount > 0 ? "bg-danger-soft border-danger/30" : "bg-white border-border"} border shadow-soft rounded-2xl p-4`}>
-          <p className="eyebrow flex items-center gap-1.5">
-            <AlertCircle className="w-3.5 h-3.5" /> SOS
-          </p>
-          <p className="text-3xl font-semibold tabular-nums text-text-primary mt-2">{sosCount}</p>
-        </div>
+        {viewMode === "active" ? (
+          <>
+            <div className="bg-white border border-border shadow-soft rounded-2xl p-4 hover-lift">
+              <p className="eyebrow flex items-center gap-1.5">
+                <Navigation className="w-3.5 h-3.5" /> Active
+              </p>
+              <p className="text-3xl font-semibold tabular-nums text-text-primary mt-2">{activeCount}</p>
+            </div>
+            <div className="bg-white border border-border shadow-soft rounded-2xl p-4 hover-lift">
+              <p className="eyebrow flex items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5" /> Total on map
+              </p>
+              <p className="text-3xl font-semibold tabular-nums text-text-primary mt-2">{positions.length}</p>
+            </div>
+            <div className={`${sosCount > 0 ? "bg-danger-soft border-danger/30" : "bg-white border-border"} border shadow-soft rounded-2xl p-4`}>
+              <p className="eyebrow flex items-center gap-1.5">
+                <AlertCircle className="w-3.5 h-3.5" /> SOS
+              </p>
+              <p className="text-3xl font-semibold tabular-nums text-text-primary mt-2">{sosCount}</p>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="bg-white border border-border shadow-soft rounded-2xl p-4 hover-lift">
+              <p className="eyebrow flex items-center gap-1.5">
+                <Navigation className="w-3.5 h-3.5" /> On trip
+              </p>
+              <p className="text-3xl font-semibold tabular-nums text-text-primary mt-2">{fleetOnTripCount}</p>
+            </div>
+            <div className="bg-white border border-border shadow-soft rounded-2xl p-4 hover-lift">
+              <p className="eyebrow flex items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5" /> Total tracked
+              </p>
+              <p className="text-3xl font-semibold tabular-nums text-text-primary mt-2">{positions.length}</p>
+            </div>
+            <div className={`${breakdownCount > 0 ? "bg-danger-soft border-danger/30" : "bg-white border-border"} border shadow-soft rounded-2xl p-4`}>
+              <p className="eyebrow flex items-center gap-1.5">
+                <AlertCircle className="w-3.5 h-3.5" /> Breakdown
+              </p>
+              <p className="text-3xl font-semibold tabular-nums text-text-primary mt-2">{breakdownCount}</p>
+            </div>
+          </>
+        )}
       </div>
 
-      <div className="grid grid-cols-3 gap-6">
-        <div className="col-span-2 space-y-4">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        <div className="lg:col-span-3 space-y-4">
           <Card padding="lg" header={<h3 className="font-serif text-xl font-medium">Fleet Map</h3>}>
             {isLoading ? (
-              <div className="h-80 skeleton flex items-center justify-center text-text-secondary text-sm">
+              <div className="h-[75vh] min-h-[560px] skeleton flex items-center justify-center text-text-secondary text-sm">
                 Loading positions…
               </div>
             ) : (
@@ -289,6 +444,7 @@ export default function TrackingPage() {
 
         <div className="space-y-3">
           <h3 className="text-sm font-semibold text-text-primary">Vehicles on map</h3>
+          <div className="space-y-3 overflow-y-auto pr-1 max-h-[75vh]">
           {positions.length === 0 ? (
             <p className="text-xs text-text-secondary">No live positions.</p>
           ) : (
@@ -313,16 +469,29 @@ export default function TrackingPage() {
                           style={{ backgroundColor: markerHex(pos.marker_color) }}
                         />
                       )}
-                      {pos.reference && (
-                        <span className="font-mono text-sm font-semibold text-text-primary">{pos.reference}</span>
+                      {pos.isFleetEntry ? (
+                        <Badge variant={pos.fleet_status === "breakdown" ? "red" : pos.fleet_status === "on_trip" ? "blue" : "default"}>
+                          {(pos.fleet_status ?? "unknown").replace("_", " ")}
+                        </Badge>
+                      ) : (
+                        <>
+                          {pos.reference && (
+                            <span className="font-mono text-sm font-semibold text-text-primary">{pos.reference}</span>
+                          )}
+                          {pos.status && <StatusBadge status={pos.status as VehicleStatus} />}
+                          {pos.status === "SOS" && <AlertCircle className="w-3.5 h-3.5 text-danger shrink-0" />}
+                        </>
                       )}
-                      {pos.status && <StatusBadge status={pos.status as VehicleStatus} />}
-                      {pos.status === "SOS" && <AlertCircle className="w-3.5 h-3.5 text-danger shrink-0" />}
                     </div>
                     <div className="flex flex-wrap items-center gap-1.5">
                       {pos.plate && (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent-gold/15 text-text-primary text-xs font-mono">
                           <Car className="w-3 h-3 text-accent-gold" /> {pos.plate}
+                        </span>
+                      )}
+                      {pos.isFleetEntry && pos.vendor_name && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-ops-card2 text-text-secondary text-xs">
+                          {pos.vendor_name}
                         </span>
                       )}
                       {pos.driver_name && (
@@ -333,6 +502,20 @@ export default function TrackingPage() {
                       {pos.speed != null && (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-ops-card2 text-text-secondary text-xs">
                           <Gauge className="w-3 h-3" /> {pos.speed} km/h
+                        </span>
+                      )}
+                      {/* Not every device/ping reports ignition (a driver-app GPS fix never
+                          does, only hardware trackers with OBD/ignition wiring) — omit the
+                          badge entirely rather than show a misleading "off" default. */}
+                      {pos.ignition != null && (
+                        <span
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs ${
+                            pos.ignition
+                              ? "bg-green-100 text-green-700"
+                              : "bg-ops-card2 text-text-secondary"
+                          }`}
+                        >
+                          <Key className="w-3 h-3" /> {pos.ignition ? "Ignition on" : "Ignition off"}
                         </span>
                       )}
                     </div>
@@ -359,6 +542,7 @@ export default function TrackingPage() {
               </button>
             ))
           )}
+          </div>
         </div>
       </div>
     </div>

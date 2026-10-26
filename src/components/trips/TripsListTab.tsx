@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/Input";
 import { TripDetailView } from "@/components/trips/TripDetailView";
 import { cursorFromUrl } from "@/hooks/useCursorPagination";
 import { DateTimePicker } from "@/components/ui/DateTimePicker";
-import { ChevronRight, ChevronLeft, X, Building2, Clock, Car } from "lucide-react";
+import { ChevronRight, ChevronLeft, X, Building2, Clock, Car, RefreshCw } from "lucide-react";
 import type { TripStatus } from "@/lib/types";
 
 type TripRequest = components["schemas"]["TripRequest"];
@@ -56,7 +56,7 @@ export const TripsListTab: React.FC = () => {
     cursor: cursor ?? undefined,
   };
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isFetching, refetch } = useQuery({
     queryKey: keys.trips.list(filters),
     queryFn: async () => {
       const { data: res, error: err } = await apiClient.GET("/v1/trips", {
@@ -165,8 +165,17 @@ export const TripsListTab: React.FC = () => {
           <label className="block text-xs font-semibold text-text-primary mb-1.5">Date to</label>
           <DateTimePicker mode="date" value={dateTo} onChange={(val) => { setDateTo(val); resetPagination(); }} />
         </div>
+        <Button
+          variant="secondary"
+          size="sm"
+          className="ml-auto self-center"
+          onClick={() => void refetch()}
+          disabled={isFetching}
+        >
+          <RefreshCw className={`w-4 h-4 mr-1 ${isFetching ? "animate-spin" : ""}`} /> Refresh
+        </Button>
         {!isLoading && trips.length > 0 && (
-          <span className="ml-auto self-center px-2.5 py-1 rounded-full bg-ops-card2 text-xs text-text-secondary tabular-nums">
+          <span className="self-center px-2.5 py-1 rounded-full bg-ops-card2 text-xs text-text-secondary tabular-nums">
             {trips.length} trip{trips.length !== 1 ? "s" : ""}{hasNext ? "+" : ""} on this page
           </span>
         )}

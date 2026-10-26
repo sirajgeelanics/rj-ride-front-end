@@ -22,6 +22,9 @@ interface VendorWriteInput {
   contact_name?: string;
   contact_phone?: string;
   contact_email?: string;
+  // Where to email "a trip was allocated to you" alerts — deliberately separate from
+  // contact_email (that field is this vendor's portal login).
+  notification_email?: string;
   airport_code?: string;
   address?: string;
   // Vendor-portal login password — the admin-chosen final value, never generated. Omitted ->
@@ -131,7 +134,7 @@ export const VendorsTab: React.FC<VendorsTabProps> = ({ searchQuery = "" }) => {
   // with cascade plus the server's own explanation, which already names the count.
   const [pendingCascade, setPendingCascade] = useState<{ id: string; reason: string } | null>(null);
 
-  const emptyForm: VendorWriteInput = { name: "", contact_name: "", contact_phone: "", contact_email: "", airport_code: "" };
+  const emptyForm: VendorWriteInput = { name: "", contact_name: "", contact_phone: "", contact_email: "", notification_email: "", airport_code: "" };
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState<VendorWriteInput>(emptyForm);
@@ -148,12 +151,14 @@ export const VendorsTab: React.FC<VendorsTabProps> = ({ searchQuery = "" }) => {
   const openEdit = (vendor: Vendor) => {
     setEditingId(vendor.id);
     const vendorAirport = (vendor as { airport_code?: string }).airport_code;
+    const vendorNotificationEmail = (vendor as { notification_email?: string }).notification_email;
     setPreserveAddress(Boolean(vendorAirport));
     setFormData({
       name: vendor.name,
       contact_name: vendor.contact_name ?? "",
       contact_phone: vendor.contact_phone ?? "",
       contact_email: vendor.contact_email ?? "",
+      notification_email: vendorNotificationEmail ?? "",
       // Legacy rows carry the location inside the address field — show it so editing never wipes it.
       airport_code: vendorAirport || vendor.address || "",
     });
@@ -175,12 +180,18 @@ export const VendorsTab: React.FC<VendorsTabProps> = ({ searchQuery = "" }) => {
       addToast("A portal password (min 8 characters) is required to create this vendor's login.", "error");
       return;
     }
+    const notificationEmail = (formData.notification_email ?? "").trim();
+    if (notificationEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(notificationEmail)) {
+      addToast("Notification email must be a valid email address.", "error");
+      return;
+    }
     const airportCode = splitAirportCodes(formData.airport_code).join(",");
     const input: VendorWriteInput = {
       name: formData.name,
       contact_name: formData.contact_name || undefined,
       contact_phone: formData.contact_phone || undefined,
       contact_email: email,
+      notification_email: notificationEmail,
       airport_code: airportCode || undefined,
       // Sync the legacy address field only on create or when migrating a legacy row (its airport
       // was empty). When editing a vendor that already had an airport code, leave its address
@@ -216,6 +227,11 @@ export const VendorsTab: React.FC<VendorsTabProps> = ({ searchQuery = "" }) => {
     {
       key: "contact_email",
       header: t("email", language),
+      render: (val): React.ReactNode => (val ? <PII value={val as string} type="email" /> : t("dash", language)),
+    },
+    {
+      key: "notification_email",
+      header: "Notification Email",
       render: (val): React.ReactNode => (val ? <PII value={val as string} type="email" /> : t("dash", language)),
     },
     {
@@ -333,6 +349,18 @@ export const VendorsTab: React.FC<VendorsTabProps> = ({ searchQuery = "" }) => {
           {editingId && (
             <VendorLoginPanel key={editingId} vendorId={editingId} vendorEmail={formData.contact_email ?? ""} />
           )}
+
+          <FormField label="Notification Email" hint="Leave blank to turn off trip-allocation email alerts for this vendor.">
+            <Input
+              type="email"
+              value={formData.notification_email ?? ""}
+              onChange={(e) => setFormData({ ...formData, notification_email: e.target.value })}
+              placeholder="ops@vendor.local"
+            />
+            <p className="text-xs text-text-secondary mt-1">
+              Separate from the login email above — RIDE emails this address whenever a trip is allocated to this vendor.
+            </p>
+          </FormField>
 
           <FormField label="Airport Code">
             <Input
