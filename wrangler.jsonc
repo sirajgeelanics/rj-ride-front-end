@@ -5,5 +5,5 @@
   "main": "worker/index.ts",
   "compatibility_date": "2025-03-25",
   "assets": { "directory": "./dist", "binding": "ASSETS" },
-  "vars": { "API_ORIGIN": "https://api-ravani.rezolv.app" }
+  "vars": { "API_ORIGIN": "http://api-ravani.f18.in" }
 }

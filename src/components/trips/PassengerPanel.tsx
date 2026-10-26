@@ -1,8 +1,22 @@
 import React, { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, Clock, Flag, MapPin, UserRound, UserX } from "lucide-react";
+import { CheckCircle2, Clock, Flag, MapPin, Navigation, UserRound, UserX } from "lucide-react";
 import { csrfFetch, keys } from "@/lib/shared";
 import { useToast } from "@/components/ui/Toast";
+
+// Matches apps.trips.services.geofence_status_for_passenger's return shape, surfaced on each
+// passenger by apps.trips.api.serializers.TripPassengerSerializer's "geofence" field — the
+// same "is the vehicle close enough?" check the backend's pickup-override/drop-override
+// endpoints already enforce server-side, exposed here so the button can be disabled BEFORE
+// someone taps it and gets a rejected request, instead of only after.
+export interface PanelGeofenceStatus {
+  phase: "pickup" | "drop" | null;
+  enabled: boolean;
+  within_radius: boolean | null;
+  distance_m: number | null;
+  radius_m: number | null;
+  reason: "no_position" | "stale_position" | "no_stop" | null;
+}
 
 export interface PanelPassenger {
   id: string;
@@ -13,6 +27,27 @@ export interface PanelPassenger {
   picked_up_at: string | null;
   dropped_at: string | null;
   dropped_stop: { id: string; address: string } | null;
+  geofence: PanelGeofenceStatus;
+}
+
+// The backend's own override endpoint silently allows the action when it has nothing to check
+// proximity against ("no_stop" -- a stop with no coordinates), so that case must not block the
+// button either, even though within_radius reads null there same as the genuinely-blocking
+// reasons. Mirrors apps.trips.services._enforce_geofence's own "nothing to check against ->
+// allow" branch exactly, so the button's enabled/disabled state never disagrees with what the
+// backend will actually do when tapped.
+function isGeofenceBlocked(g: PanelGeofenceStatus): boolean {
+  return g.enabled && g.within_radius !== true && g.reason !== "no_stop";
+}
+
+function geofenceHint(g: PanelGeofenceStatus): string | null {
+  if (!isGeofenceBlocked(g)) return null;
+  if (g.reason === "no_position") return "Waiting for the vehicle's position.";
+  if (g.reason === "stale_position") return "Vehicle's last known position is too old.";
+  if (g.distance_m != null && g.radius_m != null) {
+    return `${g.distance_m}m away — need to be within ${g.radius_m}m.`;
+  }
+  return "Vehicle is too far away.";
 }
 
 export interface PanelStop {
@@ -23,6 +58,12 @@ export interface PanelStop {
 
 const PICKUP_STATUSES = new Set(["EN_ROUTE_PICKUP", "AT_PICKUP"]);
 const DROP_STATUSES = new Set(["PAX_PICKED", "IN_TRANSIT", "AT_DROP"]);
+
+// The vendor portal doesn't collect a per-passenger OTP — these buttons always go through the
+// backend's OTP-less override endpoint, with a fixed audit reason rather than one typed per
+// click (the backend's override function requires a non-blank reason for its audit log; this
+// is the one constant value for the portal's normal, no-remark pickup/drop flow).
+const CONFIRM_REASON = "Confirmed via vendor portal (no per-passenger OTP collected)";
 
 const STATUS_LABEL: Record<PanelPassenger["status"], { text: string; cls: string }> = {
   PENDING: { text: "Waiting for pickup", cls: "bg-page-bg text-text-muted border-border" },
@@ -45,7 +86,7 @@ async function call(url: string, body?: Record<string, unknown>): Promise<void> 
   }
 }
 
-/** Each passenger's pickup/drop confirmation: the vendor/driver enters that passenger's own OTP. */
+/** Each passenger's own Pickup/Drop — one click, no OTP, no remark. */
 export function PassengerPanel({
   tripId,
   vehicleId,
@@ -61,23 +102,26 @@ export function PassengerPanel({
 }) {
   const qc = useQueryClient();
   const { addToast } = useToast();
-  const [otps, setOtps] = useState<Record<string, string>>({});
   const [dropStop, setDropStop] = useState<Record<string, string>>({});
   const base = `/api/v1/trips/${tripId}/vehicles/${vehicleId}/passengers`;
 
+  type ActionKind = "pickup-override" | "drop-override" | "no-show";
+
   const act = useMutation({
-    mutationFn: async (a: { id: string; kind: "pickup" | "drop" | "no-show"; stopId?: string }) => {
-      const body: Record<string, unknown> =
-        a.kind === "no-show" ? {} : { otp: (otps[a.id] ?? "").trim() };
-      if (a.kind === "drop" && a.stopId) body.stop_id = a.stopId;
+    mutationFn: async (a: { id: string; kind: ActionKind; stopId?: string }) => {
+      const body: Record<string, unknown> = a.kind === "no-show" ? {} : { reason: CONFIRM_REASON };
+      if (a.kind === "drop-override" && a.stopId) body.stop_id = a.stopId;
       await call(`${base}/${a.id}/${a.kind}/`, body);
     },
     onSuccess: (_d, a) => {
       addToast(
-        a.kind === "pickup" ? "Passenger picked up" : a.kind === "drop" ? "Passenger dropped" : "Marked as no-show",
+        a.kind === "pickup-override"
+          ? "Passenger picked up"
+          : a.kind === "drop-override"
+            ? "Passenger dropped"
+            : "Marked as no-show",
         "success",
       );
-      setOtps((o) => ({ ...o, [a.id]: "" }));
       void qc.invalidateQueries({ queryKey: keys.trips.all() });
     },
     onError: (err) => addToast(err instanceof Error ? err.message : "Could not confirm", "error"),
@@ -88,16 +132,15 @@ export function PassengerPanel({
 
   return (
     <div className="space-y-2 pt-1">
-      <h5 className="text-xs font-semibold text-text-primary">
-        Passengers <span className="text-text-muted font-normal">· ask each for their OTP</span>
-      </h5>
+      <h5 className="text-xs font-semibold text-text-primary">Passengers</h5>
       {passengers.map((p) => {
         const st = STATUS_LABEL[p.status];
         const canPickup = p.status === "PENDING" && PICKUP_STATUSES.has(vehicleStatus);
         const canDrop = p.status === "PICKED_UP" && DROP_STATUSES.has(vehicleStatus);
         const stopValue = dropStop[p.id] ?? p.drop_stop?.id ?? dropChoices[dropChoices.length - 1]?.id ?? "";
-        const otp = otps[p.id] ?? "";
         const changed = p.drop_stop && stopValue && stopValue !== p.drop_stop.id;
+        const geofenceBlocked = (canPickup || canDrop) && isGeofenceBlocked(p.geofence);
+        const geofenceHintText = (canPickup || canDrop) ? geofenceHint(p.geofence) : null;
         return (
           <div key={p.id} className="rounded-xl border border-border bg-card-bg p-3 space-y-2">
             <div className="flex flex-wrap items-center gap-2">
@@ -151,30 +194,25 @@ export function PassengerPanel({
                     ))}
                   </select>
                 )}
-                <input
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                  maxLength={10}
-                  placeholder={canPickup ? "Pickup OTP" : "Drop OTP"}
-                  value={otp}
-                  onChange={(e) => setOtps((m) => ({ ...m, [p.id]: e.target.value.replace(/\D/g, "") }))}
-                  aria-label={`${canPickup ? "Pickup" : "Drop"} OTP for ${p.name}`}
-                  className="w-32 rounded-lg border border-border bg-card-bg px-2.5 py-1.5 text-sm font-mono tracking-widest text-text-primary"
-                />
                 <button
                   type="button"
-                  disabled={otp.length < 4 || act.isPending}
+                  disabled={act.isPending || geofenceBlocked}
+                  title={geofenceHintText ?? undefined}
                   onClick={() =>
                     act.mutate({
                       id: p.id,
-                      kind: canPickup ? "pickup" : "drop",
+                      kind: canPickup ? "pickup-override" : "drop-override",
                       stopId: canDrop ? stopValue : undefined,
                     })
                   }
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-success/30 bg-success/10 px-3 py-1.5 text-xs font-semibold text-success hover:bg-success/20 disabled:opacity-50 transition-colors"
+                  className={
+                    canPickup
+                      ? "flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg font-medium bg-brand-blue/10 text-brand-blue border border-brand-blue/20 hover:bg-brand-blue/20 transition-colors disabled:opacity-50"
+                      : "flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition-colors disabled:opacity-50"
+                  }
                 >
                   <CheckCircle2 className="w-3.5 h-3.5" />
-                  {canPickup ? "Confirm pickup" : "Confirm drop"}
+                  {act.isPending ? "Working…" : canPickup ? "Pickup" : "Drop"}
                 </button>
                 {canPickup && (
                   <button
@@ -185,6 +223,11 @@ export function PassengerPanel({
                   >
                     No-show
                   </button>
+                )}
+                {geofenceHintText && (
+                  <span className="flex items-center gap-1 text-[11px] text-amber-700">
+                    <Navigation className="w-3 h-3 shrink-0" /> {geofenceHintText}
+                  </span>
                 )}
                 {changed && <span className="text-[11px] text-amber-700">different from the planned drop</span>}
               </div>

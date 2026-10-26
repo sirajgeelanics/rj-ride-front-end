@@ -75,7 +75,7 @@ export default function TripsPage() {
   const { addToast } = useToast();
   const qc = useQueryClient();
 
-  const { data: trips = [], isLoading } = useVendorTrips();
+  const { data: trips = [], isLoading, isFetching, refetch } = useVendorTrips();
   const [selectedTripId, setSelectedTripId] = useState<string | null>(null);
   const [showDetailDrawer, setShowDetailDrawer] = useState(false);
   const [showReassignModal, setShowReassignModal] = useState<{ tripId: string; vehicleId: string; mode: "allot" | "reassign" } | null>(null);
@@ -86,7 +86,8 @@ export default function TripsPage() {
   const [statusFilter, setStatusFilter] = useState("All");
   const debouncedSearch = useDebounce(searchQuery, 300);
 
-  const { data: tripDetail } = useVendorTripDetail(selectedTripId);
+  const { data: tripDetail, isFetching: isDetailFetching, refetch: refetchDetail } =
+    useVendorTripDetail(selectedTripId);
 
   const { data: fleetVehicles = [] } = useQuery({
     queryKey: keys.fleet.vehicles.list({}),
@@ -401,6 +402,17 @@ export default function TripsPage() {
               <X className="w-4 h-4" /> {t("clear", language)}
             </button>
           )}
+
+          <button
+            type="button"
+            onClick={() => { void refetch(); }}
+            disabled={isFetching}
+            title="Refresh the trip list"
+            className="flex items-center gap-1.5 px-3 py-2 text-sm text-text-primary border border-border rounded-lg hover:bg-page-bg disabled:opacity-50 transition-colors"
+          >
+            <RefreshCw className={`w-4 h-4 ${isFetching ? "animate-spin" : ""}`} />
+            Refresh
+          </button>
         </div>
       </div>
 
@@ -422,7 +434,19 @@ export default function TripsPage() {
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <span className="font-mono text-sm text-text-muted">{tripDetail.id}</span>
-              <StatusBadge status={tripDetail.status} size="md" />
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => { void refetchDetail(); }}
+                  disabled={isDetailFetching}
+                  title="Refresh this trip"
+                  className="flex items-center gap-1.5 px-2.5 py-1 text-xs text-text-primary border border-border rounded-lg hover:bg-page-bg disabled:opacity-50 transition-colors"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isDetailFetching ? "animate-spin" : ""}`} />
+                  Refresh
+                </button>
+                <StatusBadge status={tripDetail.status} size="md" />
+              </div>
             </div>
 
             {tripDetail.reference && (
