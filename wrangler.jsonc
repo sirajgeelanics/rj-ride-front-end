@@ -1,7 +1,8 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  // Same Worker name as the previous OpenNext deployment, so deploys replace it in place.
-  "name": "rj-ravani-front-end",
+  // Staging-only Worker, deliberately distinct from production's "rj-ravani-front-end"
+  // (main-vendor, Next.js) so a staging deploy can never overwrite the live Worker.
+  "name": "rj-ravani-front-end-stg",
   "main": "worker/index.ts",
   "compatibility_date": "2025-03-25",
   "assets": { "directory": "./dist", "binding": "ASSETS" },
