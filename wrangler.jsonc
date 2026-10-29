@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  // Staging-only Worker, deliberately distinct from production's "rj-ravani-front-end"
+  // Staging-only Worker, deliberately distinct from  production's "rj-ravani-front-end"
   // (main-vendor, Next.js) so a staging deploy can never overwrite the live Worker.
   "name": "rj-ravani-front-end-stg",
   "main": "worker/index.ts",
