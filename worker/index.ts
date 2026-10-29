@@ -11,6 +11,9 @@ const BASE = "/vendor";
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
+    if (url.pathname === "/" || url.pathname === BASE) {
+      return Response.redirect(`${url.origin}${BASE}/`, 302);
+    }
     if (url.pathname.startsWith(`${BASE}/api/`)) {
       // /vendor/api/x -> API_ORIGIN/api/x/
       const rest = url.pathname.slice(BASE.length);
