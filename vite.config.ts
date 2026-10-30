@@ -7,7 +7,7 @@ import tailwindcss from "@tailwindcss/vite";
 // to Django as /api/... with the trailing slash the API requires (same as the old middleware.ts).
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
-  const apiOrigin = env.API_ORIGIN ?? "https://api-ravani.rezolv.app";
+  const apiOrigin = env.API_ORIGIN ?? "";
   return {
     base: "/vendor/",
     build: { outDir: "dist/vendor", emptyOutDir: true },
