@@ -1,7 +1,7 @@
 import createClient, { type Middleware } from "openapi-fetch";
 import { uuidv4 } from "../uuid";
 import type { paths } from "./schema.d";
-import { BASE_PATH, apiUrl } from "./basePath";
+import { apiBaseUrl, apiUrl } from "./basePath";
 
 export interface ApiErrorData {
   name: string;
@@ -69,18 +69,33 @@ function getCookie(name: string): string | undefined {
   return match ? match.split("=")[1] : undefined;
 }
 
+// Cross-origin: document.cookie only exposes cookies for the current origin, so the csrftoken
+// set by a different API origin is invisible. Store the token captured from the X-CSRFToken
+// response header so csrfMiddleware can use it without needing to read document.cookie.
+let _csrfToken: string | null = null;
+
+function getCsrfToken(): string | undefined {
+  return getCookie("csrftoken") ?? _csrfToken ?? undefined;
+}
+
 const UNSAFE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
 let csrfFetchPromise: Promise<void> | null = null;
 
-
 async function ensureCsrfCookie(): Promise<void> {
-  if (getCookie("csrftoken")) return;
+  if (getCsrfToken()) return;
   if (!csrfFetchPromise) {
     csrfFetchPromise = fetch(apiUrl("/api/v1/auth/csrf/"), {
       credentials: "include",
     }).then(
-      () => { csrfFetchPromise = null; },
+      (res) => {
+        // Same-origin: cookie lands in document.cookie automatically.
+        // Cross-origin: the cookie is set on the API origin's jar (invisible to JS here),
+        // so read the token from the response header instead.
+        const h = res.headers.get("X-CSRFToken");
+        if (h) _csrfToken = h;
+        csrfFetchPromise = null;
+      },
       () => { csrfFetchPromise = null; },
     );
   }
@@ -98,26 +113,35 @@ export async function csrfFetch(
   input: RequestInfo | URL,
   init: RequestInit = {},
 ): Promise<Response> {
+  // Resolve root-relative paths through apiUrl (adds basePath same-origin, or API origin
+  // cross-origin). Absolute URLs and Request objects pass through unchanged.
+  let resolved: RequestInfo | URL = typeof input === "string" ? apiUrl(input) : input;
+
+  // Ensure trailing slash (Django APPEND_SLASH 301s without it; the browser converts POST→GET).
+  if (typeof resolved === "string") {
+    const [pathname, search = ""] = resolved.split("?");
+    if (pathname && !pathname.endsWith("/") && !pathname.includes(".")) {
+      resolved = search ? `${pathname}/?${search}` : `${pathname}/`;
+    }
+  }
+
   const method = (init.method ?? "GET").toUpperCase();
   const headers = new Headers(init.headers);
   if (UNSAFE_METHODS.has(method)) {
     await ensureCsrfCookie();
-    const token = getCookie("csrftoken");
+    const token = getCsrfToken();
     if (token && !headers.has("X-CSRFToken")) {
       headers.set("X-CSRFToken", token);
     }
   }
-  // Callers pass root-relative paths ("/api/v1/vendor/offers/"), which need the basePath.
-  // Request/URL objects are already absolute, so they are passed through untouched.
-  const target = typeof input === "string" ? apiUrl(input) : input;
-  return fetch(target, { credentials: "include", ...init, headers });
+  return fetch(resolved, { credentials: "include", ...init, headers });
 }
 
 const csrfMiddleware: Middleware = {
   async onRequest({ request }) {
     if (!UNSAFE_METHODS.has(request.method)) return request;
     await ensureCsrfCookie();
-    const token = getCookie("csrftoken");
+    const token = getCsrfToken();
     if (token) {
       const headers = new Headers(request.headers);
       headers.set("X-CSRFToken", token);
@@ -212,7 +236,7 @@ const errorNormalizationMiddleware: Middleware = {
 };
 
 export const apiClient = createClient<paths>({
-  baseUrl: `${BASE_PATH}/api`,
+  baseUrl: apiBaseUrl,
   credentials: "include",
 });
 
