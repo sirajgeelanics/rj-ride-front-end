@@ -13,7 +13,9 @@
  * set VITE_API_ORIGIN=https://api-ravani.fl8.in. When set, apiUrl() returns an absolute URL to
  * the API origin and the basePath prefix is omitted — there is no proxy to route through.
  */
-export const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+// Use import.meta.env so Vite statically replaces this at build time — process.env.* is a
+// runtime lookup that depends on envShim.ts having run first, which the bundler doesn't guarantee.
+export const BASE_PATH = (import.meta.env.NEXT_PUBLIC_BASE_PATH as string | undefined) ?? "";
 
 // VITE_API_ORIGIN: cross-origin API server origin. Leave empty/unset for same-origin production
 // where /vendor/api/* is proxied by the Cloudflare Worker. Example: https://api-ravani.fl8.in
