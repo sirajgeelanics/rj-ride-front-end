@@ -8,6 +8,8 @@ import { DataTable, Column } from "@/components/ui/DataTable";
 import { Drawer } from "@/components/ui/Drawer";
 import { Modal } from "@/components/ui/Modal";
 import { Input } from "@/components/ui/Input";
+import { TabSearch } from "@/components/ui/TabSearch";
+import { matchesWords } from "@/lib/search";
 import { FormField } from "@/components/ui/FormField";
 import { Select } from "@/components/ui/Select";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
@@ -58,6 +60,8 @@ export const DriversTab: React.FC<DriversTabProps> = ({ searchQuery = "" }) => {
 
   // Vendor ids to narrow the roster to. Empty = no filter (show every vendor's drivers).
   const [vendorFilter, setVendorFilter] = useState<string[]>([]);
+  // This tab's own search: by driver name only (the page-level box also matches phone numbers).
+  const [nameSearch, setNameSearch] = useState("");
 
   const { data, isLoading, error } = useQuery({
     queryKey: keys.fleet.drivers.list({ vendor_in: vendorFilter.join(",") }),
@@ -89,13 +93,14 @@ export const DriversTab: React.FC<DriversTabProps> = ({ searchQuery = "" }) => {
   const vendorFilterOptions = vendors.map((v) => ({ value: v.id, label: v.name }));
 
   const allDrivers: ApiDriver[] = (data as { results?: ApiDriver[] } | undefined)?.results ?? (data as ApiDriver[] | undefined) ?? [];
-  const drivers = searchQuery.trim()
+  const bySearchBox = searchQuery.trim()
     ? allDrivers.filter(
         (d) =>
           d.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
           d.phone.includes(searchQuery)
       )
     : allDrivers;
+  const drivers = nameSearch.trim() ? bySearchBox.filter((d) => matchesWords(d.name, nameSearch)) : bySearchBox;
 
   const createMutation = useMutation({
     mutationFn: async (input: Record<string, unknown>) => {
@@ -333,14 +338,23 @@ export const DriversTab: React.FC<DriversTabProps> = ({ searchQuery = "" }) => {
 
       {/* Narrow the roster to one or more vendors — filtered server-side, so it spans every
           driver rather than just the current page. */}
-      <div className="w-72">
-        <MultiSelectFilter
-          options={vendorFilterOptions}
-          selected={vendorFilter}
-          onChange={setVendorFilter}
-          placeholder="All vendors"
-          searchPlaceholder="Search vendors…"
+      <div className="flex flex-wrap items-start gap-3">
+        <TabSearch
+          value={nameSearch}
+          onChange={setNameSearch}
+          placeholder="Search by driver name"
+          label="Search drivers by name"
+          resultNote={`${drivers.length} of ${allDrivers.length} drivers`}
         />
+        <div className="w-72">
+          <MultiSelectFilter
+            options={vendorFilterOptions}
+            selected={vendorFilter}
+            onChange={setVendorFilter}
+            placeholder="All vendors"
+            searchPlaceholder="Search vendors…"
+          />
+        </div>
       </div>
 
       <QueryBoundary

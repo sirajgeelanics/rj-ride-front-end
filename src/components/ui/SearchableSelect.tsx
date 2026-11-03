@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Check, ChevronDown, SearchX, X } from "lucide-react";
+import { highlightParts, searchOptions } from "@/lib/search";
 
 interface Option {
   value: string;
@@ -18,6 +19,8 @@ interface Option {
   /** A short highlighted pill rendered inline right after the label (e.g. a hotel's star
    * rating, "5★"). Independent of `description`. */
   badge?: string;
+  /** Extra words that should find this option but are not displayed (e.g. a code or alias). */
+  keywords?: string;
 }
 
 interface SearchableSelectProps {
@@ -62,16 +65,8 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
   // While typing, the ✕ clears the query; while closed, it clears the selection.
   const showClear = clearable && (open ? query.length > 0 : !!value);
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return options;
-    // Name match wins outright: if anything's label matches, that's the whole result —
-    // description (e.g. a hotel's address) only gets searched when NO name matches at all, so
-    // typing a street name still finds the hotel instead of coming back empty.
-    const byName = options.filter((o) => o.label.toLowerCase().includes(q));
-    if (byName.length > 0) return byName;
-    return options.filter((o) => o.description?.toLowerCase().includes(q));
-  }, [options, query]);
+  // Every typed word must match, in any order; best matches first (see lib/search.ts).
+  const filtered = useMemo(() => searchOptions(options, query), [options, query]);
 
   useEffect(() => {
     if (!open) return;
@@ -153,7 +148,8 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
         onFocus={() => {
           setOpen(true);
           setQuery("");
-          setHighlight(filtered.findIndex((o) => !o.disabled));
+          const selectedAt = filtered.findIndex((o) => o.value === value && !o.disabled);
+          setHighlight(selectedAt >= 0 ? selectedAt : filtered.findIndex((o) => !o.disabled));
         }}
         onChange={(e) => {
           setQuery(e.target.value);
@@ -172,7 +168,19 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
             e.preventDefault();
             const opt = filtered[highlight];
             if (opt) select(opt);
+          } else if (e.key === "Home" && open) {
+            e.preventDefault();
+            setHighlight(step(-1, 1));
+          } else if (e.key === "End" && open) {
+            e.preventDefault();
+            setHighlight(step(filtered.length, -1));
           } else if (e.key === "Escape") {
+            // Close just this list. Without this the keypress also reaches a surrounding dialog
+            // and closes the whole form, throwing away what was typed.
+            if (open) {
+              e.preventDefault();
+              e.stopPropagation();
+            }
             setOpen(false);
             setQuery("");
           }
@@ -225,7 +233,8 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
           {filtered.length === 0 ? (
             <div className="px-3 py-6 flex flex-col items-center gap-1.5 text-text-tertiary">
               <SearchX className="w-5 h-5" />
-              <span className="text-sm">No matches</span>
+              <span className="text-sm">No matches for &ldquo;{query.trim()}&rdquo;</span>
+              <span className="text-xs">Try fewer or different words.</span>
             </div>
           ) : (
             filtered.map((opt, i) => (
@@ -253,7 +262,17 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
               >
                 <div className="min-w-0 flex-1">
                   <span className="flex items-center gap-1.5">
-                    <span className={`truncate ${opt.disabled ? "line-through" : ""}`}>{opt.label}</span>
+                    <span className={`truncate ${opt.disabled ? "line-through" : ""}`}>
+                      {highlightParts(opt.label, query).map((part, k) =>
+                        part.hit ? (
+                          <mark key={k} className="bg-gold-soft text-inherit rounded-sm px-0.5 -mx-0.5">
+                            {part.text}
+                          </mark>
+                        ) : (
+                          <React.Fragment key={k}>{part.text}</React.Fragment>
+                        ),
+                      )}
+                    </span>
                     {opt.badge && (
                       <span className="shrink-0 text-[11px] font-semibold leading-none text-amber-800 bg-amber-100 border border-amber-300 rounded px-1 py-0.5">
                         {opt.badge}
@@ -265,7 +284,19 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
                       Truncated, not wrapped: a long address otherwise stretches this one row
                       to 2-3 lines while its neighbours stay one, and the whole list reads as
                       uneven and messy — full text is still one hover away via the title above. */}
-                  {opt.description && <div className="text-xs text-text-tertiary truncate mt-0.5">{opt.description}</div>}
+                  {opt.description && (
+                    <div className="text-xs text-text-tertiary truncate mt-0.5">
+                      {highlightParts(opt.description, query).map((part, k) =>
+                        part.hit ? (
+                          <mark key={k} className="bg-gold-soft text-inherit rounded-sm px-0.5 -mx-0.5">
+                            {part.text}
+                          </mark>
+                        ) : (
+                          <React.Fragment key={k}>{part.text}</React.Fragment>
+                        ),
+                      )}
+                    </div>
+                  )}
                 </div>
                 {opt.disabled && opt.hint ? (
                   <span className="text-xs shrink-0 px-1.5 py-0.5 rounded bg-slate-200 text-slate-600">

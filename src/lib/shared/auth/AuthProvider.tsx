@@ -7,7 +7,7 @@ import React, {
   type ReactNode,
 } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { csrfFetch, isApiError } from "../api/client";
+import { csrfFetch, isApiError, apiBaseUrl } from "../api/client";
 import { keys } from "../api/query";
 
 export interface AuthUser {
@@ -45,7 +45,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const { data: user, isLoading } = useQuery({
     queryKey: keys.me(),
     queryFn: async () => {
-      const res = await fetch("/api/v1/auth/me/", { credentials: "include" });
+      const res = await fetch(`${apiBaseUrl}/v1/auth/me/`, { credentials: "include" });
       if (!res.ok) {
         if (res.status === 401) return null;
         throw new Error(`/v1/auth/me ${res.status}`);
@@ -63,9 +63,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(
     async (email: string, password: string) => {
       setLoginError(null);
-      const csrfRes = await fetch("/api/v1/auth/csrf/", { credentials: "include" });
+      const csrfRes = await fetch(`${apiBaseUrl}/v1/auth/csrf/`, { credentials: "include" });
       const csrfCookie = csrfRes.headers.get("X-CSRFToken") ?? (document.cookie.match(/csrftoken=([^;]+)/) ?? [])[1] ?? "";
-      const res = await fetch("/api/v1/auth/login/", {
+      const res = await fetch(`${apiBaseUrl}/v1/auth/login/`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json", "X-CSRFToken": csrfCookie },

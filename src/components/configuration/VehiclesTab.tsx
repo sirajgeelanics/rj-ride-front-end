@@ -9,6 +9,8 @@ import { Drawer } from "@/components/ui/Drawer";
 import { Modal } from "@/components/ui/Modal";
 import { MultiSelectFilter } from "@/components/ui/MultiSelectFilter";
 import { Input } from "@/components/ui/Input";
+import { TabSearch } from "@/components/ui/TabSearch";
+import { matchesCompact, matchesWords } from "@/lib/search";
 import { FormField } from "@/components/ui/FormField";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { Badge } from "@/components/ui/Badge";
@@ -54,6 +56,8 @@ export const VehiclesTab: React.FC<VehiclesTabProps> = ({ searchQuery = "" }) =>
   // Vendor / vehicle-type ids to narrow the fleet to. Empty = no filter (show everything).
   const [vendorFilter, setVendorFilter] = useState<string[]>([]);
   const [vehicleTypeFilter, setVehicleTypeFilter] = useState<string[]>([]);
+  // This tab's own search: by registration (plate) only. Spaces and dashes are ignored.
+  const [plateSearch, setPlateSearch] = useState("");
 
   const { data: vehiclesData, isLoading, error } = useQuery({
     // The filters are part of the key, so each combination is cached separately and switching
@@ -117,7 +121,7 @@ export const VehiclesTab: React.FC<VehiclesTabProps> = ({ searchQuery = "" }) =>
 
   const allVehicles: ApiVehicle[] = (vehiclesData as { results?: ApiVehicle[] } | undefined)?.results ?? (vehiclesData as ApiVehicle[] | undefined) ?? [];
 
-  const vehicles = searchQuery.trim()
+  const bySearchBox = searchQuery.trim()
     ? allVehicles.filter(
         (v) =>
           v.plate.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -125,6 +129,9 @@ export const VehiclesTab: React.FC<VehiclesTabProps> = ({ searchQuery = "" }) =>
           v.vehicle_type_name?.toLowerCase().includes(searchQuery.toLowerCase())
       )
     : allVehicles;
+  const vehicles = plateSearch.trim()
+    ? bySearchBox.filter((v) => matchesCompact(v.plate, plateSearch))
+    : bySearchBox;
 
   const createMutation = useMutation({
     mutationFn: async (input: VehicleWriteInput) => {
@@ -357,10 +364,17 @@ export const VehiclesTab: React.FC<VehiclesTabProps> = ({ searchQuery = "" }) =>
 
       <HealthStrip expiredCount={0} expiringCount={0} />
 
-      {/* Narrow the fleet to one or more vendors and/or vehicle types. Both filter server-side
-          (?vendor_in=/?vehicle_type_in=), so they span the whole fleet, not just the rows
-          already fetched. */}
-      <div className="flex flex-wrap gap-3">
+      {/* Search by registration, and/or narrow the fleet to one or more vendors and/or vehicle
+          types. The two filters run server-side (?vendor_in=/?vehicle_type_in=); the plate search
+          runs over every vehicle loaded (all pages), ignoring spaces and dashes. */}
+      <div className="flex flex-wrap items-start gap-3">
+        <TabSearch
+          value={plateSearch}
+          onChange={setPlateSearch}
+          placeholder="Search by registration, e.g. KA01AB1234"
+          label="Search vehicles by registration number"
+          resultNote={`${vehicles.length} of ${allVehicles.length} vehicles`}
+        />
         <div className="w-72">
           <MultiSelectFilter
             options={vendorFilterOptions}

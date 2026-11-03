@@ -23,6 +23,39 @@ type BoardColumns = {
 const EXCEPTION_STATUSES = ["SOS", "BREAKDOWN", "ACCIDENT", "NO_SHOW"];
 const ACTIVE_STATUSES = ["ASSIGNED", "EN_ROUTE_PICKUP", "IN_TRANSIT"];
 
+/** The local calendar date (YYYY-MM-DD) of an instant — not the UTC date, which is "yesterday" or
+ * "tomorrow" for several hours a day in India. */
+function localDay(value: string | Date): string {
+  const d = typeof value === "string" ? new Date(value) : value;
+  if (Number.isNaN(d.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+function KpiCard({
+  kpi,
+  isLoading,
+}: {
+  kpi: { label: string; value: number; icon: React.ComponentType<{ className?: string }>; description: string };
+  isLoading: boolean;
+}) {
+  const Icon = kpi.icon;
+  return (
+    <div className="bg-white rounded-2xl border border-border shadow-soft p-5 hover-lift">
+      <div className="flex items-start justify-between gap-3">
+        <p className="eyebrow">{kpi.label}</p>
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl surface-navy text-white">
+          <Icon className="w-5 h-5" />
+        </span>
+      </div>
+      <p className="mt-3 text-4xl font-semibold tabular-nums leading-none text-text-primary">
+        {isLoading ? <span className="skeleton inline-block h-9 w-14 align-middle" /> : kpi.value}
+      </p>
+      <p className="mt-2 text-xs text-text-secondary">{kpi.description}</p>
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   useRideEvents({ invalidationMap: wsInvalidationMap });
 
@@ -53,32 +86,57 @@ export default function DashboardPage() {
     (col) => columns[col] ?? []
   );
 
-  const pendingCount = (columns["PENDING"] ?? []).length;
-  const activeCount = ACTIVE_STATUSES.flatMap((s) => columns[s] ?? []).length;
+  const pendingCards = columns["PENDING"] ?? [];
+  const activeCards = ACTIVE_STATUSES.flatMap((s) => columns[s] ?? []);
   const exceptionCount = allCards.filter((c) => EXCEPTION_STATUSES.includes(c.status)).length;
 
-  const todayStr = new Date().toISOString().split("T")[0] ?? "";
-  const todayPickups = allCards.filter((c) => c.pickup_at?.startsWith(todayStr)).length;
+  // Overall = everything still open on the board, whatever its pickup date.
+  const pendingCount = pendingCards.length;
+  const activeCount = activeCards.length;
+
+  // Today = trips whose pickup is on today's local date.
+  const todayStr = localDay(new Date());
+  const isToday = (c: BoardCard) => !!c.pickup_at && localDay(c.pickup_at) === todayStr;
+  const pendingToday = pendingCards.filter(isToday).length;
+  const activeToday = activeCards.filter(isToday).length;
+  const todayPickups = allCards.filter(isToday).length;
 
   const totalVehicles = vehiclesData?.length ?? 0;
   const activeDrivers = driversData?.filter((d) => d.is_active).length ?? 0;
 
   const isLoading = boardLoading || vehiclesLoading || driversLoading;
 
+  const todayKpis = [
+    {
+      label: "Active Trips · Today",
+      value: activeToday,
+      icon: TrendingUp,
+      color: "bg-brand-blue",
+      description: `Assigned, en route or in transit · pickup today`,
+    },
+    {
+      label: "Pending · Today",
+      value: pendingToday,
+      icon: Clock,
+      color: "bg-[#072D62]",
+      description: `Awaiting assignment · ${todayPickups} pickup${todayPickups === 1 ? "" : "s"} scheduled today`,
+    },
+  ];
+
   const kpis = [
     {
-      label: "Active Trips",
+      label: "Active Trips · Overall",
       value: activeCount,
       icon: TrendingUp,
       color: "bg-brand-blue",
-      description: "En route or in transit",
+      description: "Assigned, en route or in transit · all dates",
     },
     {
-      label: "Pending",
+      label: "Pending · Overall",
       value: pendingCount,
       icon: Clock,
       color: "bg-[#072D62]",
-      description: "Awaiting assignment",
+      description: "Awaiting assignment · all dates",
     },
     {
       label: "Fleet Vehicles",
@@ -112,25 +170,28 @@ export default function DashboardPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 stagger">
-        {kpis.map((kpi) => {
-          const Icon = kpi.icon;
-          return (
-            <div key={kpi.label} className="bg-white rounded-2xl border border-border shadow-soft p-5 hover-lift">
-              <div className="flex items-start justify-between gap-3">
-                <p className="eyebrow">{kpi.label}</p>
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl surface-navy text-white">
-                  <Icon className="w-5 h-5" />
-                </span>
-              </div>
-              <p className="mt-3 text-4xl font-semibold tabular-nums leading-none text-text-primary">
-                {isLoading ? <span className="skeleton inline-block h-9 w-14 align-middle" /> : kpi.value}
-              </p>
-              <p className="mt-2 text-xs text-text-secondary">{kpi.description}</p>
-            </div>
-          );
-        })}
-      </div>
+      <section aria-labelledby="kpi-overall" className="space-y-3">
+        <h2 id="kpi-overall" className="font-serif text-xl font-medium text-text-primary">Overall</h2>
+        <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 stagger">
+          {kpis.map((kpi) => (
+            <KpiCard key={kpi.label} kpi={kpi} isLoading={isLoading} />
+          ))}
+        </div>
+      </section>
+
+      <section aria-labelledby="kpi-today" className="space-y-3">
+        <div className="flex items-baseline gap-2">
+          <h2 id="kpi-today" className="font-serif text-xl font-medium text-text-primary">Today</h2>
+          <span className="text-xs text-text-secondary">
+            {new Date().toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" })}
+          </span>
+        </div>
+        <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 stagger">
+          {todayKpis.map((kpi) => (
+            <KpiCard key={kpi.label} kpi={kpi} isLoading={isLoading} />
+          ))}
+        </div>
+      </section>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
         <Card padding="lg" header={<h3 className="font-serif text-xl font-medium text-text-primary flex items-center gap-2"><Zap className="w-4 h-4 text-accent-gold" /> Dispatch Board Summary</h3>}>

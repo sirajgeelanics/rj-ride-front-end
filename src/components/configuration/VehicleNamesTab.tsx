@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/Button";
 import { DataTable, Column } from "@/components/ui/DataTable";
 import { Drawer } from "@/components/ui/Drawer";
 import { Input } from "@/components/ui/Input";
+import { TabSearch } from "@/components/ui/TabSearch";
+import { matchesCompact, matchesWords } from "@/lib/search";
 import { FormField } from "@/components/ui/FormField";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { MultiSelectFilter } from "@/components/ui/MultiSelectFilter";
@@ -49,6 +51,8 @@ export const VehicleNamesTab: React.FC<VehicleNamesTabProps> = ({ searchQuery = 
   // Vehicle-type ids to narrow the list to. Empty = no filter. Client-side — the whole catalog
   // is already fetched in one go (fetchAllPages), unlike the paginated fleet Vehicles list.
   const [vehicleTypeFilter, setVehicleTypeFilter] = useState<string[]>([]);
+  // This tab's own search: by car name only (the page-level box searches across more fields).
+  const [nameSearch, setNameSearch] = useState("");
   const vehicleTypeFilterOptions = vehicleTypes.map((vt) => ({ value: vt.id, label: vt.name }));
 
   const bySearch = searchQuery.trim()
@@ -58,9 +62,10 @@ export const VehicleNamesTab: React.FC<VehicleNamesTabProps> = ({ searchQuery = 
           n.vehicle_type_name.toLowerCase().includes(searchQuery.toLowerCase()),
       )
     : allNames;
-  const names = vehicleTypeFilter.length
+  const byType = vehicleTypeFilter.length
     ? bySearch.filter((n) => vehicleTypeFilter.includes(n.vehicle_type))
     : bySearch;
+  const names = nameSearch.trim() ? byType.filter((n) => matchesWords(n.name, nameSearch)) : byType;
 
   const createMutation = useMutation({
     mutationFn: async (input: VehicleNameWriteInput) => {
@@ -195,15 +200,24 @@ export const VehicleNamesTab: React.FC<VehicleNamesTabProps> = ({ searchQuery = 
         </Button>
       </div>
 
-      {/* Narrow the catalog to one or more vehicle types. */}
-      <div className="w-72">
-        <MultiSelectFilter
-          options={vehicleTypeFilterOptions}
-          selected={vehicleTypeFilter}
-          onChange={setVehicleTypeFilter}
-          placeholder="All vehicle types"
-          searchPlaceholder="Search vehicle types…"
+      {/* Search by car name, and/or narrow the catalog to one or more vehicle types. */}
+      <div className="flex flex-wrap items-start gap-3">
+        <TabSearch
+          value={nameSearch}
+          onChange={setNameSearch}
+          placeholder="Search by name, e.g. Fortuner"
+          label="Search vehicle names"
+          resultNote={`${names.length} of ${byType.length} names`}
         />
+        <div className="w-72">
+          <MultiSelectFilter
+            options={vehicleTypeFilterOptions}
+            selected={vehicleTypeFilter}
+            onChange={setVehicleTypeFilter}
+            placeholder="All vehicle types"
+            searchPlaceholder="Search vehicle types…"
+          />
+        </div>
       </div>
 
       <QueryBoundary

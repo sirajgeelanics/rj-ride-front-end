@@ -13,6 +13,8 @@ import { FormField } from "@/components/ui/FormField";
 import { Badge } from "@/components/ui/Badge";
 import { DateTimePicker } from "@/components/ui/DateTimePicker";
 import { PassengerRecord, type PassengerRow } from "@/components/trips/PassengerRecord";
+import { AIRPORT_PLACES, hotelToPlace, type LocalPlace } from "@/lib/places";
+import { splitAirportCodes } from "@/lib/airportCodes";
 import { Plus, Minus, ArrowRight, Clock, Users, MapPin, Plane, TrainFront, Hotel, Building2, Trash2, Car, UserRound } from "lucide-react";
 
 type Customer = components["schemas"]["Customer"];
@@ -61,6 +63,8 @@ interface StopEntry {
   lng: number;
   planned_time: string;
   flight_number: string;
+  /** RICH's reference when the stop was picked from the hotel list. */
+  hotel_mapping_id?: string;
 }
 
 interface PaxEntry {
@@ -215,6 +219,46 @@ export const ManualTripCreation: React.FC<{ onDone?: () => void }> = ({ onDone }
   const customers = (customersData?.results ?? []) as Customer[];
   const vehicleTypes = (vehicleTypesData?.results ?? []) as VehicleType[];
   const vendors = (vendorsData?.results ?? []) as Vendor[];
+
+  // Hotels RICH knows near the selected vendor's airport(s) — offered as instant suggestions in
+  // every address box. Failure or "not configured" just means no hotel suggestions (never blocks).
+  const vendorAirports = splitAirportCodes((vendors.find((v) => v.id === vendorId) as { airport_code?: string } | undefined)?.airport_code);
+  const { data: hotelPlaces = [] } = useQuery({
+    queryKey: ["manual-entry-hotels", vendorAirports.join(",")],
+    enabled: vendorAirports.length > 0,
+    staleTime: 10 * 60_000,
+    queryFn: async (): Promise<LocalPlace[]> => {
+      const lists = await Promise.all(
+        vendorAirports.map(async (code) => {
+          const resp = await csrfFetch(`/api/v1/pricing/hotels/?airport_code=${encodeURIComponent(code)}`);
+          if (!resp.ok) return [];
+          const body = (await resp.json()) as {
+            result?: { id: number | string | null; mapping_id: string; name: string; address: string; city: string }[];
+          };
+          return (body.result ?? []).map((h) => hotelToPlace(h, code));
+        }),
+      );
+      return lists.flat();
+    },
+  });
+  const localPlaces = useMemo(() => [...hotelPlaces, ...AIRPORT_PLACES], [hotelPlaces]);
+
+  const selectLocalPlace = (idx: number, place: LocalPlace) => {
+    setStops((prev) =>
+      prev.map((st, i) =>
+        i === idx
+          ? {
+              ...st,
+              address: place.address,
+              lat: 0,
+              lng: 0, // located by the server when the trip is booked
+              location_type: place.kind === "airport" ? "AIRPORT" : "HOTEL",
+              hotel_mapping_id: place.hotelMappingId,
+            }
+          : st,
+      ),
+    );
+  };
   const rateCards = (rateCardsData?.results ?? []) as RateCard[];
 
   // Vehicle types covered by an ACTIVE, currently-valid rate card for the selected vendor.
@@ -389,6 +433,7 @@ export const ManualTripCreation: React.FC<{ onDone?: () => void }> = ({ onDone }
             extra: {
               planned_time: s.planned_time || undefined,
               flight_number: s.flight_number || undefined,
+              hotel_mapping_id: s.hotel_mapping_id || undefined,
             },
           })),
           vehicles: chosen.map(({ slot, offer }) => ({
@@ -438,7 +483,7 @@ export const ManualTripCreation: React.FC<{ onDone?: () => void }> = ({ onDone }
   // necessarily match what's in the box. Picking a suggestion sets address + lat + lng together
   // (AddressAutocomplete.onSelect), so the coordinates always come from a real matched place.
   const updateStopAddressText = (idx: number, address: string) => {
-    setStops((prev) => prev.map((s, i) => i === idx ? { ...s, address, lat: 0, lng: 0 } : s));
+    setStops((prev) => prev.map((s, i) => i === idx ? { ...s, address, lat: 0, lng: 0, hotel_mapping_id: undefined } : s));
   };
   const selectStopAddress = (idx: number, result: { address: string; lat: number; lng: number }) => {
     setStops((prev) => prev.map((s, i) => i === idx ? { ...s, ...result } : s));
@@ -627,6 +672,8 @@ export const ManualTripCreation: React.FC<{ onDone?: () => void }> = ({ onDone }
                     hasCoordinates={!!stop.lat && !!stop.lng}
                     onTextChange={(text) => updateStopAddressText(idx, text)}
                     onSelect={(result) => selectStopAddress(idx, result)}
+                    localPlaces={localPlaces}
+                    onSelectLocal={(place) => selectLocalPlace(idx, place)}
                   />
 
                   <div role="radiogroup" aria-label="Location type" className="flex flex-wrap gap-1.5">

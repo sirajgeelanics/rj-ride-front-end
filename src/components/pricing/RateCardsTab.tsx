@@ -44,6 +44,12 @@ interface HotelRate {
   pickup_price_minor: number;
   drop_price_minor: number;
   currency: string;
+  // Versioning (same idea as rate cards): a price change is a new version with a start date.
+  version: number;
+  version_count: number;
+  valid_from: string;
+  valid_to: string | null;
+  status: "ACTIVE" | "UPCOMING" | "EXPIRED";
 }
 
 interface HotelSearchResult {
@@ -95,6 +101,7 @@ interface DisplayRow {
   valid_from?: string;
   valid_to?: string | null;
   version?: number;
+  status?: "ACTIVE" | "UPCOMING" | "EXPIRED";
 }
 
 // Symbols for the currencies actually in use across tenants today (core.money.DEFAULT_CURRENCY
@@ -204,6 +211,10 @@ export const RateCardsTab: React.FC<RateCardsTabProps> = ({ searchQuery = "" }) 
       pickup_price_minor: h.pickup_price_minor,
       drop_price_minor: h.drop_price_minor,
       currency: h.currency,
+      valid_from: h.valid_from,
+      valid_to: h.valid_to,
+      version: h.version,
+      status: h.status,
     })),
   ];
 
@@ -308,6 +319,8 @@ export const RateCardsTab: React.FC<RateCardsTabProps> = ({ searchQuery = "" }) 
       pickup_price_minor: number;
       drop_price_minor: number;
       currency?: string;
+      valid_from?: string;
+      valid_to?: string | null;
     }) => {
       const resp = await csrfFetch("/api/v1/config/pricing/hotel-rates/", {
         method: "POST",
@@ -327,11 +340,11 @@ export const RateCardsTab: React.FC<RateCardsTabProps> = ({ searchQuery = "" }) 
   });
 
   const updateHotelRateMutation = useMutation({
-    mutationFn: async ({ id, pickup, drop }: { id: string; pickup: number; drop: number }) => {
+    mutationFn: async ({ id, pickup, drop, valid_to }: { id: string; pickup: number; drop: number; valid_to: string | null }) => {
       const resp = await csrfFetch(`/api/v1/config/pricing/hotel-rates/${id}/`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pickup_price_minor: pickup, drop_price_minor: drop }),
+        body: JSON.stringify({ pickup_price_minor: pickup, drop_price_minor: drop, valid_to }),
       });
       const body = (await resp.json()) as { result?: HotelRate; error?: { message?: string } };
       if (!resp.ok) throw new Error(body?.error?.message ?? `Update failed (${resp.status})`);
@@ -339,10 +352,50 @@ export const RateCardsTab: React.FC<RateCardsTabProps> = ({ searchQuery = "" }) 
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: keys.config.hotelRates.list() });
-      addToast("Hotel rate updated.", "success");
+      addToast("Hotel rate corrected.", "success");
       setDrawerOpen(false);
     },
     onError: (err: unknown) => addToast(err instanceof Error ? err.message : "Failed to update hotel rate", "error"),
+  });
+
+  // A price change: the next version, starting on a chosen date. The current version keeps
+  // applying until then, and trips are priced by the version valid on their PICKUP date.
+  const newHotelVersionMutation = useMutation({
+    mutationFn: async (input: { id: string; valid_from: string; valid_to: string | null; pickup: number; drop: number; currency: string }) => {
+      const resp = await csrfFetch(`/api/v1/config/pricing/hotel-rates/${input.id}/new-version/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          valid_from: input.valid_from,
+          valid_to: input.valid_to,
+          pickup_price_minor: input.pickup,
+          drop_price_minor: input.drop,
+          currency: input.currency,
+        }),
+      });
+      const body = (await resp.json()) as { result?: HotelRate; error?: { message?: string } };
+      if (!resp.ok) throw new Error(body?.error?.message ?? `Could not add the version (${resp.status})`);
+      return body.result;
+    },
+    onSuccess: (created) => {
+      void queryClient.invalidateQueries({ queryKey: keys.config.hotelRates.list() });
+      addToast(
+        created && created.status === "UPCOMING"
+          ? `Version ${created.version} scheduled from ${created.valid_from}.`
+          : `Version ${created?.version ?? ""} is now in force.`,
+        "success",
+      );
+      setDrawerOpen(false);
+    },
+    onError: (err: unknown) => addToast(err instanceof Error ? err.message : "Failed to add the version", "error"),
+  });
+
+  // Every version of one hotel deal, newest first.
+  const [historyFor, setHistoryFor] = useState<HotelRate | null>(null);
+  const { data: historyRows = [], isFetching: historyLoading } = useQuery({
+    queryKey: ["hotel-rate-versions", historyFor?.id],
+    enabled: historyFor !== null,
+    queryFn: () => fetchJson<HotelRate[]>(`/api/v1/config/pricing/hotel-rates/${historyFor?.id}/versions/`),
   });
 
   const [pendingDelete, setPendingDelete] = useState<HotelRate | null>(null);
@@ -388,6 +441,9 @@ export const RateCardsTab: React.FC<RateCardsTabProps> = ({ searchQuery = "" }) 
 
   const isHotelRate = formData.basis === "HOTEL_RATE";
   const isEditingExisting = drawerMode === "edit" && supersedingId !== null;
+  // Editing OR adding a version to an existing hotel rate: the vendor / vehicle type / airport /
+  // hotel are fixed (changing any would be a different deal).
+  const isExistingHotelDeal = isHotelRate && supersedingId !== null;
 
   const selectedVendor = vendors.find((v) => v.id === formData.vendor_id);
   const vendorAirportCodes = splitAirportCodes(selectedVendor?.airport_code);
@@ -396,18 +452,18 @@ export const RateCardsTab: React.FC<RateCardsTabProps> = ({ searchQuery = "" }) 
   // A single-airport vendor's airport is implied the moment it's picked; a multi-airport
   // vendor needs an explicit choice (mirrors VehiclesTab.tsx's showAirport/airportOptions).
   useEffect(() => {
-    if (!isHotelRate || isEditingExisting) return;
+    if (!isHotelRate || isExistingHotelDeal) return;
     if (vendorAirportCodes.length === 1) {
       setAirportCode(vendorAirportCodes[0] ?? "");
     } else if (vendorAirportCodes.length === 0) {
       setAirportCode("");
     }
-  }, [formData.vendor_id, isHotelRate, isEditingExisting, vendorAirportCodes]);
+  }, [formData.vendor_id, isHotelRate, isExistingHotelDeal, vendorAirportCodes]);
 
   const { data: hotelOptions, isFetching: hotelsLoading } = useQuery({
     queryKey: keys.config.hotelSearch.list(airportCode),
     queryFn: () => fetchJson<HotelSearchResult[]>(`/api/v1/pricing/hotels/?airport_code=${airportCode}`),
-    enabled: isHotelRate && Boolean(airportCode) && !isEditingExisting,
+    enabled: isHotelRate && Boolean(airportCode) && !isExistingHotelDeal,
   });
 
   /**
@@ -457,7 +513,8 @@ export const RateCardsTab: React.FC<RateCardsTabProps> = ({ searchQuery = "" }) 
         vendor_id: h.vendor,
         vehicle_type_id: h.vehicle_type,
         basis: "HOTEL_RATE",
-        valid_from: today,
+        valid_from: h.valid_from,
+        valid_to: h.valid_to,
         currency: h.currency,
       });
       setAirportCode(h.airport_code);
@@ -481,6 +538,13 @@ export const RateCardsTab: React.FC<RateCardsTabProps> = ({ searchQuery = "" }) 
     setDrawerMode("edit");
     setSupersedingId(rc.id);
     seedForm(rc);
+  };
+
+  /** Add the next version of a hotel rate: same deal, new prices, starting on a chosen date. */
+  const openHotelNewVersion = (h: HotelRate) => {
+    openEdit({ _kind: "hotel_rate", id: h.id } as DisplayRow);
+    setDrawerMode("supersede");
+    setFormData((prev) => ({ ...prev, valid_from: today, valid_to: undefined }));
   };
 
   const openSupersede = (rc: RateCard) => {
@@ -534,8 +598,28 @@ export const RateCardsTab: React.FC<RateCardsTabProps> = ({ searchQuery = "" }) 
         return;
       }
 
+      if (drawerMode === "supersede" && supersedingId) {
+        if (!formData.valid_from) {
+          addToast("Choose the date the new price starts.", "error");
+          return;
+        }
+        if (formData.valid_to && formData.valid_to < formData.valid_from) {
+          addToast("The end date cannot be before the start date.", "error");
+          return;
+        }
+        newHotelVersionMutation.mutate({
+          id: supersedingId,
+          valid_from: formData.valid_from,
+          valid_to: formData.valid_to ?? null,
+          pickup,
+          drop,
+          currency,
+        });
+        return;
+      }
+
       if (isEditingExisting && supersedingId) {
-        updateHotelRateMutation.mutate({ id: supersedingId, pickup, drop });
+        updateHotelRateMutation.mutate({ id: supersedingId, pickup, drop, valid_to: formData.valid_to ?? null });
         return;
       }
 
@@ -554,6 +638,8 @@ export const RateCardsTab: React.FC<RateCardsTabProps> = ({ searchQuery = "" }) 
         pickup_price_minor: pickup,
         drop_price_minor: drop,
         currency,
+        valid_from: formData.valid_from || undefined,
+        valid_to: formData.valid_to ?? null,
       });
       return;
     }
@@ -666,7 +752,17 @@ export const RateCardsTab: React.FC<RateCardsTabProps> = ({ searchQuery = "" }) 
     {
       key: "valid_to",
       header: t("validTo", language),
-      render: (val, row): React.ReactNode => ((row as Record<string, unknown>)._kind === "hotel_rate" ? t("dash", language) : val ? (val as string) : "∞"),
+      render: (val): React.ReactNode => (val ? (val as string) : "∞"),
+    },
+    {
+      key: "status",
+      header: "Status",
+      render: (val): React.ReactNode => {
+        const st = val as string | undefined;
+        if (!st) return t("dash", language);
+        const variant = st === "ACTIVE" ? "green" : st === "UPCOMING" ? "blue" : "default";
+        return <Badge variant={variant}>{st === "ACTIVE" ? "Active" : st === "UPCOMING" ? "Upcoming" : "Expired"}</Badge>;
+      },
     },
     {
       key: "version",
@@ -688,9 +784,28 @@ export const RateCardsTab: React.FC<RateCardsTabProps> = ({ searchQuery = "" }) 
           const h = hotelRates.find((hr) => hr.id === display.id);
           return (
             <div className="flex items-center gap-2">
-              <Button size="sm" variant="ghost" onClick={() => openEdit(display)}>
-                {t("edit", language)}
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => openEdit(display)}
+                title={`Correct v${h?.version ?? ""} in place — the price history is not kept; use New version for a real price change`}
+              >
+                Correct
               </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="hover:bg-brand-wine/10! hover:text-brand-wine!"
+                onClick={() => h && openHotelNewVersion(h)}
+                title="Set new prices from a chosen date, keeping the current ones on record"
+              >
+                {t("newVersion", language)}
+              </Button>
+              {h && h.version_count > 1 && (
+                <Button size="sm" variant="ghost" onClick={() => setHistoryFor(h)}>
+                  History
+                </Button>
+              )}
               <Button
                 size="sm"
                 variant="ghost"
@@ -785,10 +900,12 @@ export const RateCardsTab: React.FC<RateCardsTabProps> = ({ searchQuery = "" }) 
         title={
           drawerMode === "edit"
             ? isHotelRate
-              ? "Edit hotel rate"
+              ? "Correct hotel rate"
               : "Edit this version (version number unchanged)"
             : drawerMode === "supersede"
-              ? t("newVersion", language)
+              ? isHotelRate
+                ? "New hotel rate version"
+                : t("newVersion", language)
               : t("newRateCard", language)
         }
         size="xl"
@@ -887,7 +1004,14 @@ export const RateCardsTab: React.FC<RateCardsTabProps> = ({ searchQuery = "" }) 
 
           {isHotelRate && (
             <>
-              {isEditingExisting ? (
+              {isExistingHotelDeal && drawerMode === "supersede" && (
+                <div className="rounded-lg border border-accent-gold/40 bg-gold-soft px-3 py-2.5 text-xs text-text-primary">
+                  The current price keeps applying until the start date below. Trips are priced by the
+                  version valid on their <span className="font-semibold">pickup date</span>, and quotes
+                  already given are not changed.
+                </div>
+              )}
+              {isExistingHotelDeal ? (
                 <FormField label="Airport">
                   <div className="px-3 py-2 bg-page-bg border border-border rounded-lg text-sm text-text-secondary">
                     {airportCode}
@@ -910,8 +1034,8 @@ export const RateCardsTab: React.FC<RateCardsTabProps> = ({ searchQuery = "" }) 
                 )
               )}
 
-              <FormField label="Hotel" required hint={isEditingExisting ? undefined : "Sourced live from RICH, filtered to the airport above."}>
-                {isEditingExisting ? (
+              <FormField label="Hotel" required hint={isExistingHotelDeal ? undefined : "Sourced live from RICH, filtered to the airport above."}>
+                {isExistingHotelDeal ? (
                   <div className="px-3 py-2 bg-page-bg border border-border rounded-lg text-sm">
                     <div className="flex items-center gap-1.5">
                       <span className="text-text-secondary">{selectedHotel?.name ?? "—"}</span>
@@ -958,6 +1082,35 @@ export const RateCardsTab: React.FC<RateCardsTabProps> = ({ searchQuery = "" }) 
             </>
           )}
 
+          {isHotelRate && (
+            <>
+              <FormField
+                label={drawerMode === "supersede" ? "New price starts on" : t("validFrom", language)}
+                required={drawerMode !== "edit"}
+                hint={
+                  drawerMode === "supersede"
+                    ? "Pick a future date to schedule the change; today applies it straight away."
+                    : drawerMode === "edit"
+                      ? "The start date of a later version is fixed when it is created."
+                      : "The first day this price applies."
+                }
+              >
+                {drawerMode === "edit" && (hotelRates.find((hr) => hr.id === supersedingId)?.version ?? 1) > 1 ? (
+                  <div className="px-3 py-2 bg-page-bg border border-border rounded-lg text-sm text-text-secondary">
+                    {formData.valid_from}
+                  </div>
+                ) : (
+                  <DateTimePicker mode="date" value={formData.valid_from}
+                    onChange={(val) => setFormData({ ...formData, valid_from: val })} />
+                )}
+              </FormField>
+              <FormField label={t("validTo", language)} hint="Optional — leave empty to keep it open-ended.">
+                <DateTimePicker mode="date" value={formData.valid_to ?? ""}
+                  onChange={(val) => setFormData({ ...formData, valid_to: val || undefined })} />
+              </FormField>
+            </>
+          )}
+
           {!isHotelRate && (
             <>
               <FormField label={t("validFrom", language)}>
@@ -976,10 +1129,12 @@ export const RateCardsTab: React.FC<RateCardsTabProps> = ({ searchQuery = "" }) 
             <Button
               onClick={handleSave}
               variant="primary"
-              disabled={createMutation.isPending || supersedeMutation.isPending || updateMutation.isPending || createHotelRateMutation.isPending || updateHotelRateMutation.isPending}
+              disabled={createMutation.isPending || supersedeMutation.isPending || updateMutation.isPending || createHotelRateMutation.isPending || updateHotelRateMutation.isPending || newHotelVersionMutation.isPending}
             >
               {drawerMode === "edit"
-                ? "Save changes"
+                ? isHotelRate
+                  ? "Save correction"
+                  : "Save changes"
                 : drawerMode === "supersede"
                   ? t("createVersion", language)
                   : t("create", language)}
@@ -991,10 +1146,52 @@ export const RateCardsTab: React.FC<RateCardsTabProps> = ({ searchQuery = "" }) 
         </div>
       </Modal>
 
+      <Modal
+        open={historyFor !== null}
+        onClose={() => setHistoryFor(null)}
+        title={historyFor ? `${historyFor.hotel_name} — price history` : "Price history"}
+        size="xl"
+      >
+        {historyLoading ? (
+          <p className="text-sm text-text-secondary">Loading…</p>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-[11px] uppercase tracking-wider text-text-tertiary">
+                <th className="py-2 pr-3">Version</th>
+                <th className="py-2 pr-3">Status</th>
+                <th className="py-2 pr-3">Valid</th>
+                <th className="py-2 pr-3 text-right">Pickup (hotel→airport)</th>
+                <th className="py-2 text-right">Drop (airport→hotel)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {historyRows.map((v) => (
+                <tr key={v.id} className="border-t border-ops-line">
+                  <td className="py-2 pr-3"><Badge variant="purple">v{v.version}</Badge></td>
+                  <td className="py-2 pr-3">
+                    <Badge variant={v.status === "ACTIVE" ? "green" : v.status === "UPCOMING" ? "blue" : "default"}>
+                      {v.status === "ACTIVE" ? "Active" : v.status === "UPCOMING" ? "Upcoming" : "Expired"}
+                    </Badge>
+                  </td>
+                  <td className="py-2 pr-3 tabular">{v.valid_from} → {v.valid_to ?? "∞"}</td>
+                  <td className="py-2 pr-3 text-right tabular">{formatMoney(v.pickup_price_minor, v.currency)}</td>
+                  <td className="py-2 text-right tabular">{formatMoney(v.drop_price_minor, v.currency)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </Modal>
+
       <ConfirmDialog
         open={pendingDelete !== null}
         title="Remove this hotel rate?"
-        message={pendingDelete ? `This stops pricing airport transfers for ${pendingDelete.hotel_name}.` : ""}
+        message={
+          pendingDelete
+            ? `This stops pricing airport transfers for ${pendingDelete.hotel_name}${pendingDelete.version_count > 1 ? ` and removes all ${pendingDelete.version_count} of its versions` : ""}. To change the price instead, add a new version.`
+            : ""
+        }
         confirmLabel="Remove"
         destructive
         busy={deleteHotelRateMutation.isPending}

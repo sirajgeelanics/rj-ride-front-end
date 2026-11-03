@@ -2,6 +2,12 @@ import createClient, { type Middleware } from "openapi-fetch";
 import { uuidv4 } from "../uuid";
 import type { paths } from "./schema.d";
 
+// VITE_API_ORIGIN: the API server origin for cross-origin deployments (e.g. staging).
+// Leave empty/unset for same-origin production where /api/* is proxied on the same domain.
+// Example: VITE_API_ORIGIN=https://api-ravani.fl8.in
+const _apiOrigin = (import.meta.env.VITE_API_ORIGIN ?? "").replace(/\/$/, "");
+export const apiBaseUrl: string = _apiOrigin ? `${_apiOrigin}/api` : "/api";
+
 export interface ApiErrorData {
   name: string;
   code: string;
@@ -68,17 +74,33 @@ function getCookie(name: string): string | undefined {
   return match ? match.split("=")[1] : undefined;
 }
 
+// Cross-origin: document.cookie only exposes cookies for the current origin, so the csrftoken
+// set by a different API origin is invisible. Store the token captured from the X-CSRFToken
+// response header so csrfMiddleware can use it without needing to read document.cookie.
+let _csrfToken: string | null = null;
+
+function getCsrfToken(): string | undefined {
+  return getCookie("csrftoken") ?? _csrfToken ?? undefined;
+}
+
 const UNSAFE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
 let csrfFetchPromise: Promise<void> | null = null;
 
 async function ensureCsrfCookie(): Promise<void> {
-  if (getCookie("csrftoken")) return;
+  if (getCsrfToken()) return;
   if (!csrfFetchPromise) {
-    csrfFetchPromise = fetch("/api/v1/auth/csrf/", {
+    csrfFetchPromise = fetch(`${apiBaseUrl}/v1/auth/csrf/`, {
       credentials: "include",
     }).then(
-      () => { csrfFetchPromise = null; },
+      (res) => {
+        // Same-origin: cookie lands in document.cookie automatically.
+        // Cross-origin: the cookie is set on the API origin's jar (invisible to JS here),
+        // so read the token from the response header instead.
+        const h = res.headers.get("X-CSRFToken");
+        if (h) _csrfToken = h;
+        csrfFetchPromise = null;
+      },
       () => { csrfFetchPromise = null; },
     );
   }
@@ -88,31 +110,47 @@ async function ensureCsrfCookie(): Promise<void> {
 /**
  * `fetch` drop-in for the handful of call sites that build requests by hand instead of
  * through `apiClient` (trip quote/book, bulk upload, clone, cancel, quote simulator).
- * It defaults `credentials: "include"` and — for unsafe methods — ensures the CSRF cookie
- * exists and attaches the `X-CSRFToken` header, exactly like `csrfMiddleware` does for the
- * typed client. Without it Django rejects those POSTs with 403 "CSRF token missing".
+ * It defaults `credentials: "include"`, resolves relative `/api/...` paths against the
+ * configured API origin (so cross-origin staging and same-origin production both work from
+ * the same call sites), ensures a trailing slash, and — for unsafe methods — fetches a CSRF
+ * token and attaches the `X-CSRFToken` header.
  */
 export async function csrfFetch(
   input: RequestInfo | URL,
   init: RequestInit = {},
 ): Promise<Response> {
+  // Resolve relative /api/... paths: replace the /api prefix with the full apiBaseUrl so
+  // cross-origin staging targets api-ravani.fl8.in rather than the frontend origin.
+  let resolved: RequestInfo | URL = input;
+  if (typeof input === "string" && input.startsWith("/api/")) {
+    resolved = `${apiBaseUrl}${input.slice(4)}`; // slice(4) drops "/api", keeps "/v1/..."
+  }
+
+  // Ensure trailing slash (Django APPEND_SLASH 301s without it; the browser converts POST→GET).
+  if (typeof resolved === "string") {
+    const [pathname, search = ""] = resolved.split("?");
+    if (pathname && !pathname.endsWith("/") && !pathname.includes(".")) {
+      resolved = search ? `${pathname}/?${search}` : `${pathname}/`;
+    }
+  }
+
   const method = (init.method ?? "GET").toUpperCase();
   const headers = new Headers(init.headers);
   if (UNSAFE_METHODS.has(method)) {
     await ensureCsrfCookie();
-    const token = getCookie("csrftoken");
+    const token = getCsrfToken();
     if (token && !headers.has("X-CSRFToken")) {
       headers.set("X-CSRFToken", token);
     }
   }
-  return fetch(input, { credentials: "include", ...init, headers });
+  return fetch(resolved, { credentials: "include", ...init, headers });
 }
 
 const csrfMiddleware: Middleware = {
   async onRequest({ request }) {
     if (!UNSAFE_METHODS.has(request.method)) return request;
     await ensureCsrfCookie();
-    const token = getCookie("csrftoken");
+    const token = getCsrfToken();
     if (token) {
       const headers = new Headers(request.headers);
       headers.set("X-CSRFToken", token);
@@ -214,7 +252,7 @@ const errorNormalizationMiddleware: Middleware = {
 };
 
 export const apiClient = createClient<paths>({
-  baseUrl: "/api",
+  baseUrl: apiBaseUrl,
   credentials: "include",
 });
 
