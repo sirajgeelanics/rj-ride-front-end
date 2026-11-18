@@ -1,11 +1,5 @@
 node_modules
-.next
 dist
-build
-*.log
-.env
-.env.local
-.DS_Store
-tsconfig.tsbuildinfo
-.open-next/
-.wrangler/
+*.tsbuildinfo
+
+.early.coverage.env.local

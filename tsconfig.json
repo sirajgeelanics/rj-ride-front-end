@@ -17,31 +17,23 @@
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "jsx": "preserve",
-    "incremental": true,
+    "jsx": "react-jsx",
+    "noEmit": true,
+    "allowJs": true,
+    "types": [
+      "vite/client",
+      "node"
+    ],
     "baseUrl": ".",
     "paths": {
       "@/*": [
-        "./*"
+        "./src/*"
       ]
-    },
-    "plugins": [
-      {
-        "name": "next"
-      }
-    ],
-    "allowJs": true,
-    "noEmit": true
+    }
   },
   "include": [
-    "next-env.d.ts",
-    "**/*.ts",
-    "**/*.tsx",
-    ".next/types/**/*.ts",
-    ".next/dev/types/**/*.ts"
-  ],
-  "exclude": [
-    "node_modules",
-    "Ride_demo"
+    "src",
+    "vite.config.ts",
+    "vitest.config.ts"
   ]
 }
