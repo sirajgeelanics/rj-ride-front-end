@@ -420,9 +420,12 @@ export default function TripsPage() {
         <div className="text-center py-8 text-text-muted text-sm">Loading trips…</div>
       ) : (
         <DataTable
+          // Remount on a new search/filter so the table returns to page 1 instead of staying on
+          // a page number that may no longer exist for the narrowed list.
+          key={`${statusFilter}|${searchQuery}`}
           columns={columns}
           data={filteredTrips}
-          pageSize={15}
+          pageSize={25}
           emptyMessage={t("noTripsMatch", language)}
           onRowClick={(trip) => { setSelectedTripId(trip.id); setShowDetailDrawer(true); }}
         />

@@ -6,6 +6,7 @@ import { useAuth, useLanguageStore, t, csrfFetch } from "@/lib/shared";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "@/lib/router";
 import { useToast } from "@/components/ui/Toast";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 export const NAV_ITEMS = [
   { href: "/" as const, labelKey: "dashboard" as const, icon: LayoutDashboard, shortcut: "1" as const },
@@ -42,14 +43,23 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen = false, onMobileCl
   const language = useLanguageStore((s) => s.language);
   const { logout } = useAuth();
   const { addToast } = useToast();
+  // Signing out is only done from the confirmation dialog, never straight from the sidebar
+  // button, so a stray click can't end the session (and any unsaved work with it).
+  const [confirmLogout, setConfirmLogout] = React.useState(false);
+  const [signingOut, setSigningOut] = React.useState(false);
 
   const handleLogout = async () => {
+    setSigningOut(true);
     try {
       await logout();
+      setConfirmLogout(false);
       router.push("/login");
       onMobileClose?.();
     } catch (err) {
+      setConfirmLogout(false);
       addToast(err instanceof Error ? err.message : "Sign out failed. Please try again.", "error");
+    } finally {
+      setSigningOut(false);
     }
   };
 
@@ -122,7 +132,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen = false, onMobileCl
       {/* Logout */}
       <div className="px-3 pb-4 border-t border-white/10 pt-3">
         <button
-          onClick={handleLogout}
+          onClick={() => setConfirmLogout(true)}
           className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-white/70 hover:text-white hover:bg-white/[0.08] outline-none focus-visible:ring-2 focus-visible:ring-accent-gold transition-colors w-full"
         >
           <LogOut className="w-[18px] h-[18px] shrink-0" />
@@ -150,6 +160,18 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen = false, onMobileCl
           </div>
         </div>
       )}
+
+      {/* After the mobile overlay in the DOM so it stacks above it (both are z-50). */}
+      <ConfirmDialog
+        open={confirmLogout}
+        title={t("logoutConfirmTitle", language)}
+        message={t("logoutConfirmMessage", language)}
+        confirmLabel={t("logout", language)}
+        cancelLabel={t("cancel", language)}
+        busy={signingOut}
+        onConfirm={() => void handleLogout()}
+        onCancel={() => { if (!signingOut) setConfirmLogout(false); }}
+      />
     </>
   );
 };

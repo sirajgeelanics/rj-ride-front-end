@@ -33,6 +33,8 @@ export const translations = {
     earnings: 'Earnings',
     alerts: 'Alerts',
     logout: 'Logout',
+    logoutConfirmTitle: 'Sign out?',
+    logoutConfirmMessage: 'You will need to sign in again to use the vendor portal.',
 
     // ─── Nav / Sidebar — Ops Portal ───
     controlRoom: 'Control Room',

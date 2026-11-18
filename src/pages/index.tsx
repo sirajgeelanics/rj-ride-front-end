@@ -2,6 +2,7 @@ import React from "react";
 import { Link } from "@/lib/router";
 import { useQuery } from "@tanstack/react-query";
 import { apiClient, keys, useSession, useLanguageStore, t } from "@/lib/shared";
+import { useVendorTrips } from "@/hooks/useVendorTrips";
 import type { components } from "@/lib/shared/api/schema.d";
 import { KpiCard } from "@/components/ui/KpiCard";
 import { StatusBadge } from "@/components/ui/StatusBadge";
@@ -28,17 +29,11 @@ export default function DashboardPage() {
   const { user } = useSession();
   const language = useLanguageStore((s) => s.language);
 
-  const { data: trips = [] } = useQuery({
-    queryKey: keys.trips.list({}),
-    queryFn: async () => {
-      const { data: res, error: err } = await apiClient.GET("/v1/trips", {
-        params: { query: {} },
-      });
-      if (err) throw err;
-      return (res?.results ?? []) as Trip[];
-    },
-    staleTime: 30_000,
-  });
+  // The same full trip list the Trips page uses. This used to run its own single-page query under
+  // the SAME cache key (keys.trips.list({})), so opening Trips shortly after the dashboard served
+  // that 25-trip page from cache. One shared loader means one cache entry holding every trip —
+  // and the KPI counts below are no longer limited to the latest 25 trips either.
+  const { data: trips = [] } = useVendorTrips();
 
   const { data: vehicles = [] } = useQuery({
     queryKey: keys.fleet.vehicles.list({}),
