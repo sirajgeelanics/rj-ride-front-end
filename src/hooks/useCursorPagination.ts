@@ -31,6 +31,11 @@ export function cursorFromUrl(url: string | null | undefined): string | null {
  * `basePath` is a REST path that may already carry a query string (e.g. `?vendor_in=…`).
  */
 export async function fetchAllPages<T>(basePath: string): Promise<T[]> {
+  // Ask for the server's maximum page (100) instead of the default 25: a 1,500-vehicle fleet is
+  // 15 sequential requests rather than 60. Callers that set their own page_size keep it.
+  if (!/[?&]page_size=/.test(basePath)) {
+    basePath += `${basePath.includes("?") ? "&" : "?"}page_size=100`;
+  }
   const all: T[] = [];
   let cursor: string | null = null;
   // Hard cap: a misbehaving server that always returns `next` must not loop forever.

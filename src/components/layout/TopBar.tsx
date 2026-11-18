@@ -6,6 +6,7 @@ import { useAuth, useLanguageStore, t } from "@/lib/shared";
 import { useToastStore } from "@/stores/toastStore";
 import { NAV_ITEMS } from "@/components/layout/Sidebar";
 import { FleetImportMenu } from "@/components/layout/FleetImportMenu";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 const ROLE_LABEL: Record<string, string> = {
   AGENCY_ADMIN: "Agency Admin",
@@ -21,8 +22,22 @@ export const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
   const { user, logout } = useAuth();
   const language = useLanguageStore((s) => s.language);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [confirmSignOut, setConfirmSignOut] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
   const pathname = usePathname();
   const addToast = useToastStore((s) => s.addToast);
+
+  const handleSignOut = async () => {
+    setSigningOut(true);
+    try {
+      await logout();
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : "Sign out failed. Please try again.", "error");
+    } finally {
+      setSigningOut(false);
+      setConfirmSignOut(false);
+    }
+  };
 
   // The active sidebar module — shown in place of the old "RIDE" wordmark.
   const activeItem =
@@ -42,7 +57,8 @@ export const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
   const roleLabel = user?.role ? (ROLE_LABEL[user.role] ?? user.role) : undefined;
 
   return (
-    // Glass header: sticky, hairline bottom border, translucent cream with backdrop blur.
+    <>
+    {/* Glass header: sticky, hairline bottom border, translucent cream with backdrop blur. */}
     <header className="h-16 border-b border-border/70 glass flex items-center justify-between px-3 sm:px-5 sticky top-0 z-30">
       <div className="flex items-center gap-2 sm:gap-3 min-w-0">
         <button
@@ -95,13 +111,10 @@ export const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
                   {roleLabel && <p className="text-xs text-accent-gold font-medium">{roleLabel}</p>}
                 </div>
                 <button
-                  onClick={async () => {
+                  onClick={() => {
+                    // Ask first — the actual sign-out runs from the confirmation dialog below.
                     setShowUserMenu(false);
-                    try {
-                      await logout();
-                    } catch (err) {
-                      addToast(err instanceof Error ? err.message : "Sign out failed. Please try again.", "error");
-                    }
+                    setConfirmSignOut(true);
                   }}
                   role="menuitem"
                   className="w-full px-4 py-2.5 text-sm text-danger hover:bg-danger-soft text-left transition-colors"
@@ -114,6 +127,17 @@ export const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
         </div>
       </div>
     </header>
+
+    <ConfirmDialog
+      open={confirmSignOut}
+      title="Sign out?"
+      message="You will need to sign in again to use the ops portal."
+      confirmLabel="Sign out"
+      busy={signingOut}
+      onConfirm={() => void handleSignOut()}
+      onCancel={() => { if (!signingOut) setConfirmSignOut(false); }}
+    />
+    </>
   );
 };
 

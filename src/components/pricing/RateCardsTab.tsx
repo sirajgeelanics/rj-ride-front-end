@@ -4,6 +4,7 @@ import { useLanguageStore, t, apiClient, keys, QueryBoundary, formatMoney, toMin
 import type { components } from "@/lib/shared/api/schema.d";
 import { fetchAllPages } from "@/hooks/useCursorPagination";
 import { splitAirportCodes } from "@/lib/airportCodes";
+import { daysRemaining } from "@/lib/daysRemaining";
 import { Button } from "@/components/ui/Button";
 import { DataTable, Column } from "@/components/ui/DataTable";
 import { Modal } from "@/components/ui/Modal";
@@ -93,6 +94,8 @@ interface DisplayRow {
   vehicle_type_name: string;
   vehicle_type: string;
   hotel_name?: string;
+  /** Whole days until valid_to (0 = last day, negative = expired, null = no expiry). */
+  days_remaining?: number | null;
   rate_per_km_minor?: number | null;
   rate_per_hour_minor?: number | null;
   pickup_price_minor?: number;
@@ -185,6 +188,14 @@ export const RateCardsTab: React.FC<RateCardsTabProps> = ({ searchQuery = "" }) 
   const vendors = (vendorsData?.results ?? []) as ApiVendor[];
   const vts = (vehicleTypesData?.results ?? []) as components["schemas"]["VehicleType"][];
 
+  // "Days remaining" must move on its own: re-read the clock every minute so the numbers roll
+  // over at midnight without anyone reloading the page.
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(new Date()), 60_000);
+    return () => window.clearInterval(id);
+  }, []);
+
   const displayRows: DisplayRow[] = [
     ...rateCards.map((r): DisplayRow => ({
       _kind: "rate_card",
@@ -198,6 +209,7 @@ export const RateCardsTab: React.FC<RateCardsTabProps> = ({ searchQuery = "" }) 
       currency: r.currency,
       valid_from: r.valid_from,
       valid_to: r.valid_to,
+      days_remaining: daysRemaining(r.valid_to, now),
       version: r.version,
     })),
     ...hotelRates.map((h): DisplayRow => ({
@@ -213,6 +225,7 @@ export const RateCardsTab: React.FC<RateCardsTabProps> = ({ searchQuery = "" }) 
       currency: h.currency,
       valid_from: h.valid_from,
       valid_to: h.valid_to,
+      days_remaining: daysRemaining(h.valid_to, now),
       version: h.version,
       status: h.status,
     })),
@@ -753,6 +766,19 @@ export const RateCardsTab: React.FC<RateCardsTabProps> = ({ searchQuery = "" }) 
       key: "valid_to",
       header: t("validTo", language),
       render: (val): React.ReactNode => (val ? (val as string) : "∞"),
+    },
+    {
+      key: "days_remaining",
+      header: "Days remaining",
+      sortable: true,
+      render: (val): React.ReactNode => {
+        const days = val as number | null | undefined;
+        if (days === null || days === undefined) return <span className="text-text-tertiary">No expiry</span>;
+        if (days < 0) return <Badge variant="red">Expired</Badge>;
+        if (days === 0) return <Badge variant="amber">Last day</Badge>;
+        const label = `${days} ${days === 1 ? "day" : "days"}`;
+        return days <= 7 ? <Badge variant="amber">{label}</Badge> : <span>{label}</span>;
+      },
     },
     {
       key: "status",

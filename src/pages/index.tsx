@@ -1,15 +1,21 @@
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
-import { apiClient, keys, wsInvalidationMap } from "@/lib/shared";
-import { fetchAllPages } from "@/hooks/useCursorPagination";
+import { apiClient, csrfFetch, keys, wsInvalidationMap } from "@/lib/shared";
 import { useRideEvents } from "@/lib/shared/realtime/ws";
 import type { components } from "@/lib/shared/api/schema.d";
 import { Card } from "@/components/ui/Card";
 import { TrendingUp, Truck, Users, Calendar, AlertCircle, CheckCircle2, Clock, Zap } from "lucide-react";
 
 type BoardCard = components["schemas"]["BoardCard"];
-type Driver = components["schemas"]["Driver"];
-type Vehicle = components["schemas"]["Vehicle"];
+
+type FleetTotals = { count: number; active: number };
+
+async function fetchCount(path: string): Promise<FleetTotals> {
+  const resp = await csrfFetch(path, { credentials: "include" });
+  if (!resp.ok) throw new Error(`Failed to load ${path} (${resp.status})`);
+  const body = (await resp.json()) as { result: FleetTotals };
+  return body.result;
+}
 
 type BoardColumns = {
   PENDING: BoardCard[];
@@ -69,15 +75,19 @@ export default function DashboardPage() {
     refetchInterval: 30_000,
   });
 
-  const { data: vehiclesData, isLoading: vehiclesLoading } = useQuery({
-    queryKey: keys.fleet.vehicles.list(),
-    queryFn: () => fetchAllPages<Vehicle>("/api/v1/fleet/vehicles/"),
+  // The tiles only show numbers, so ask the server for the totals instead of downloading every
+  // vehicle and driver (a 1,500-vehicle fleet was dozens of requests). The keys share the
+  // ["fleet", "vehicles"|"drivers"] prefix, so fleet invalidations still refresh them, but are
+  // NOT the list keys: those hold full record arrays and must not be overwritten with a count.
+  const { data: vehicleTotals, isLoading: vehiclesLoading } = useQuery({
+    queryKey: ["fleet", "vehicles", "count"],
+    queryFn: () => fetchCount("/api/v1/fleet/vehicles/count/"),
     staleTime: 60_000,
   });
 
-  const { data: driversData, isLoading: driversLoading } = useQuery({
-    queryKey: keys.fleet.drivers.list(),
-    queryFn: () => fetchAllPages<Driver>("/api/v1/fleet/drivers/"),
+  const { data: driverTotals, isLoading: driversLoading } = useQuery({
+    queryKey: ["fleet", "drivers", "count"],
+    queryFn: () => fetchCount("/api/v1/fleet/drivers/count/"),
     staleTime: 60_000,
   });
 
@@ -101,8 +111,8 @@ export default function DashboardPage() {
   const activeToday = activeCards.filter(isToday).length;
   const todayPickups = allCards.filter(isToday).length;
 
-  const totalVehicles = vehiclesData?.length ?? 0;
-  const activeDrivers = driversData?.filter((d) => d.is_active).length ?? 0;
+  const totalVehicles = vehicleTotals?.count ?? 0;
+  const activeDrivers = driverTotals?.active ?? 0;
 
   const isLoading = boardLoading || vehiclesLoading || driversLoading;
 
