@@ -746,16 +746,18 @@ export const RateCardsTab: React.FC<RateCardsTabProps> = ({ searchQuery = "" }) 
           : t("dash", language),
     },
     {
-      key: "pickup_price_minor",
-      header: "Pickup (hotel→airport)",
+      // Ops vocabulary: Pickup = airport → hotel, Drop = hotel → airport. The API stores them the
+      // other way round (pickup_price_minor = hotel → airport), so each label reads the other field.
+      key: "drop_price_minor",
+      header: "Pickup (airport→hotel)",
       render: (val, row): React.ReactNode =>
         val != null
           ? formatMoney(val as number, ((row as Record<string, unknown>).currency as string) || "USD")
           : t("dash", language),
     },
     {
-      key: "drop_price_minor",
-      header: "Drop (airport→hotel)",
+      key: "pickup_price_minor",
+      header: "Drop (hotel→airport)",
       render: (val, row): React.ReactNode =>
         val != null
           ? formatMoney(val as number, ((row as Record<string, unknown>).currency as string) || "USD")
@@ -1084,18 +1086,7 @@ export const RateCardsTab: React.FC<RateCardsTabProps> = ({ searchQuery = "" }) 
                 )}
               </FormField>
 
-              <FormField label={`Pickup price — hotel → airport (${CURRENCY_SYMBOL[formData.currency ?? "USD"] ?? formData.currency})`}>
-                <Input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  placeholder="e.g. 800.00"
-                  value={pickupText}
-                  onChange={(e) => setPickupText(e.target.value)}
-                />
-              </FormField>
-
-              <FormField label={`Drop price — airport → hotel (${CURRENCY_SYMBOL[formData.currency ?? "USD"] ?? formData.currency})`}>
+              <FormField label={`Pickup price — airport → hotel (${CURRENCY_SYMBOL[formData.currency ?? "USD"] ?? formData.currency})`}>
                 <Input
                   type="number"
                   min="0"
@@ -1103,6 +1094,17 @@ export const RateCardsTab: React.FC<RateCardsTabProps> = ({ searchQuery = "" }) 
                   placeholder="e.g. 900.00"
                   value={dropText}
                   onChange={(e) => setDropText(e.target.value)}
+                />
+              </FormField>
+
+              <FormField label={`Drop price — hotel → airport (${CURRENCY_SYMBOL[formData.currency ?? "USD"] ?? formData.currency})`}>
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="e.g. 800.00"
+                  value={pickupText}
+                  onChange={(e) => setPickupText(e.target.value)}
                 />
               </FormField>
             </>
@@ -1187,8 +1189,8 @@ export const RateCardsTab: React.FC<RateCardsTabProps> = ({ searchQuery = "" }) 
                 <th className="py-2 pr-3">Version</th>
                 <th className="py-2 pr-3">Status</th>
                 <th className="py-2 pr-3">Valid</th>
-                <th className="py-2 pr-3 text-right">Pickup (hotel→airport)</th>
-                <th className="py-2 text-right">Drop (airport→hotel)</th>
+                <th className="py-2 pr-3 text-right">Pickup (airport→hotel)</th>
+                <th className="py-2 text-right">Drop (hotel→airport)</th>
               </tr>
             </thead>
             <tbody>
@@ -1201,8 +1203,8 @@ export const RateCardsTab: React.FC<RateCardsTabProps> = ({ searchQuery = "" }) 
                     </Badge>
                   </td>
                   <td className="py-2 pr-3 tabular">{v.valid_from} → {v.valid_to ?? "∞"}</td>
-                  <td className="py-2 pr-3 text-right tabular">{formatMoney(v.pickup_price_minor, v.currency)}</td>
-                  <td className="py-2 text-right tabular">{formatMoney(v.drop_price_minor, v.currency)}</td>
+                  <td className="py-2 pr-3 text-right tabular">{formatMoney(v.drop_price_minor, v.currency)}</td>
+                  <td className="py-2 text-right tabular">{formatMoney(v.pickup_price_minor, v.currency)}</td>
                 </tr>
               ))}
             </tbody>
