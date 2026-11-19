@@ -3,6 +3,7 @@ import { useRouter } from "@/lib/router";
 import { useAuth } from "@/lib/shared";
 import { isApiError } from "@/lib/shared";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { AppVersion } from "@/components/ui/AppVersion";
 
 export default function LoginPage() {
   const { login, logout } = useAuth();
@@ -136,6 +137,8 @@ export default function LoginPage() {
               {loading ? "Signing in…" : "Sign in"}
             </button>
           </form>
+
+          <p className="mt-5 text-center text-[11px] text-text-secondary"><AppVersion /></p>
         </div>
       </div>
     </div>

@@ -125,7 +125,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ open = false, onClose }) => {
             </div>
           ))}
         </nav>
-        <div className="relative px-5 py-4 border-t border-white/10">
+        <div className="relative px-5 py-4">
           <p className="text-[10px] uppercase tracking-[0.18em] text-white/40 font-mono">Rezolv · RIDE</p>
         </div>
       </aside>

@@ -7,6 +7,7 @@ import { useToastStore } from "@/stores/toastStore";
 import { NAV_ITEMS } from "@/components/layout/Sidebar";
 import { FleetImportMenu } from "@/components/layout/FleetImportMenu";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { AppVersion } from "@/components/ui/AppVersion";
 
 const ROLE_LABEL: Record<string, string> = {
   AGENCY_ADMIN: "Agency Admin",
@@ -82,6 +83,7 @@ export const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
           <span className="hidden sm:inline">Availability</span>
         </Link>
 
+        <AppVersion className="hidden md:inline text-xs text-text-secondary" />
         {/* Profile — dropdown menu matching the vendor portal's Header pattern. */}
         <div className="relative">
           <button
