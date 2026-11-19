@@ -71,30 +71,37 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen = false, onMobileCl
 
   const sidebarContent = (
     // Deep navy rail with a faint radial glow; active route = translucent white pill + gold bar.
-    <aside className="relative w-60 min-h-screen flex flex-col text-white overflow-hidden bg-[radial-gradient(120%_60%_at_0%_0%,rgba(179,150,97,0.16),transparent_55%),linear-gradient(180deg,#0A3470_0%,#072D62_45%,#051F45_100%)] border-r border-white/5">
+    <aside className="relative w-60 min-h-screen flex flex-col text-white overflow-hidden bg-[linear-gradient(180deg,#0A3470_0%,#072D62_45%,#04204A_100%)] shadow-[1px_0_0_rgba(255,255,255,0.05)]">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -top-24 -left-16 h-64 w-64 rounded-full bg-[radial-gradient(circle,rgba(179,150,97,0.22)_0%,transparent_65%)]"
+      />
       {/* Logo */}
-      <div className="px-5 py-5 border-b border-white/10 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <span className="w-9 h-9 rounded-xl bg-white/10 ring-1 ring-white/15 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] flex items-center justify-center shrink-0">
-            <span className="w-2.5 h-2.5 rounded-full bg-accent-gold" />
-          </span>
-          <div>
-            <p className="font-serif text-white text-2xl leading-none tracking-tight">{t('rideTM', language)}</p>
-            <p className="text-accent-gold text-[10px] uppercase tracking-[0.2em] mt-1.5">{t('vendorPortal', language)}</p>
+      <div className="relative px-5 pt-5 pb-4">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 ring-1 ring-white/15 shadow-[inset_0_1px_0_rgba(255,255,255,0.15)] flex-shrink-0">
+              <span className="font-serif text-xl leading-none text-accent-gold">R</span>
+            </span>
+            <div className="min-w-0">
+              <p className="font-serif text-2xl font-normal text-white tracking-tight leading-none">{t('rideTM', language)}</p>
+              <p className="text-[9px] uppercase tracking-[0.2em] text-white/50 mt-1.5 truncate">{t('vendorPortal', language)}</p>
+            </div>
           </div>
+          {/* Mobile close button */}
+          <button
+            onClick={onMobileClose}
+            aria-label="Close menu"
+            className="lg:hidden p-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
-        {/* Mobile close button */}
-        <button
-          onClick={onMobileClose}
-          aria-label="Close menu"
-          className="lg:hidden p-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors"
-        >
-          <X className="w-5 h-5" />
-        </button>
+        <div className="mt-4 h-px bg-gradient-to-r from-accent-gold/50 via-white/10 to-transparent" />
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 py-4 px-3 space-y-1">
+      <nav aria-label="Primary" className="relative flex-1 py-1 px-3 flex flex-col gap-0.5">
         {NAV_ITEMS.map((item) => {
           const isActive = pathname === item.href;
           const Icon = item.icon;
@@ -113,7 +120,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen = false, onMobileCl
               {isActive && (
                 <span className="absolute left-0 top-2 bottom-2 w-[3px] rounded-full bg-accent-gold animate-fade-in" />
               )}
-              <Icon className={`w-[18px] h-[18px] shrink-0 ${isActive ? "text-accent-gold" : "text-white/60 group-hover:text-white"}`} />
+              <Icon className={`w-[18px] h-[18px] shrink-0 ${isActive ? "text-accent-gold" : "text-white/50 group-hover:text-white"}`} />
               <span className="flex-1">{t(item.labelKey, language)}</span>
               {item.href === "/offers" && pendingOffers > 0 && (
                 <span
@@ -130,7 +137,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen = false, onMobileCl
       </nav>
 
       {/* Logout */}
-      <div className="px-3 pb-4 border-t border-white/10 pt-3">
+      <div className="relative px-3 pb-3 pt-3">
         <button
           onClick={() => setConfirmLogout(true)}
           className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-white/70 hover:text-white hover:bg-white/[0.08] outline-none focus-visible:ring-2 focus-visible:ring-accent-gold transition-colors w-full"
@@ -138,6 +145,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen = false, onMobileCl
           <LogOut className="w-[18px] h-[18px] shrink-0" />
           {t('logout', language)}
         </button>
+      </div>
+      <div className="relative px-5 py-4">
+        <p className="text-[10px] uppercase tracking-[0.18em] text-white/40 font-mono">Rezolv · RIDE</p>
       </div>
     </aside>
   );

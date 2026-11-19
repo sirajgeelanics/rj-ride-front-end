@@ -3,6 +3,7 @@ import { Bell, Menu } from "lucide-react";
 import { useAuth } from "@/lib/shared";
 import { useToast } from "@/components/ui/Toast";
 import { NotificationDrawer } from "@/components/notifications/NotificationDrawer";
+import { AppVersion } from "@/components/ui/AppVersion";
 
 interface HeaderProps {
   title: string;
@@ -46,6 +47,7 @@ export const Header: React.FC<HeaderProps> = ({ title, onToggleMobile }) => {
           <Bell className="w-[18px] h-[18px] text-text-secondary" />
         </button>
 
+        <AppVersion className="hidden md:inline text-xs text-text-muted" />
         <div className="relative">
           <button
             onClick={() => setShowUserMenu(!showUserMenu)}
